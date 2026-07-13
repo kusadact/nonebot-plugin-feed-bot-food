@@ -20,6 +20,7 @@ class ClassificationError(RuntimeError):
 class Classification:
     category: FoodCategory
     value: Decimal | None = None
+    too_much: bool = False
 
 
 _TYPE_ALIASES = {
@@ -92,9 +93,13 @@ class FoodClassifier:
             "meal 表示正餐或主食，water 表示水，snack 表示甜品/小食/零食，non_edible 表示不可食用。"
             "如果用户输入包含多个食物或饮品，必须把它们作为一个整体判断，只选择主要类别并返回一个 value；"
             "不要拆分食物，不要返回多个分类或多个 value。"
+            "请识别输入中的数量、重量和单位（例如包、只、根、个、斤、kg），用于判断本次投喂是否超出可吃上限。"
+            "如果用户请求的食物数量或重量超过对应类别的范围上限，必须设置 too_much 为 true，"
+            "并将 value 截断为该类别的最大上限；这表示 Bot 吃不下更多，只吃最大限制的食物。"
+            "如果没有超过上限，too_much 必须为 false。"
             "如果无法确定，必须返回 unknown。请根据食物和对应范围给出 value（单位 kg）："
             f"meal {meal[0]}-{meal[1]}，water {water[0]}-{water[1]}，snack {snack[0]}-{snack[1]}。"
-            '只能返回 JSON 对象，格式为 {"type":"meal|water|snack|non_edible|unknown","value":0.00}，不要输出解释。'
+            '只能返回 JSON 对象，格式为 {"type":"meal|water|snack|non_edible|unknown","value":0.00,"too_much":true|false}，不要输出解释。'
         )
 
     def _parse_response(self, payload: Any) -> Classification:
@@ -120,8 +125,9 @@ class FoodClassifier:
             return Classification(FoodCategory.UNKNOWN)
         index = (FoodCategory.MEAL, FoodCategory.WATER, FoodCategory.SNACK).index(category)
         lower, upper = self.config.category_gain_ranges[index]
-        gain = min(max(gain, lower), upper)
-        return Classification(category, gain)
+        too_much = value.get("too_much") is True or gain > upper
+        gain = upper if too_much else min(max(gain, lower), upper)
+        return Classification(category, gain, too_much)
 
     @staticmethod
     def _extract_content(payload: Any) -> str:

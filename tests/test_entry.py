@@ -61,6 +61,19 @@ def test_non_edible_feed_has_a_user_facing_message() -> None:
     assert format_feed_result({"status": "non_edible", "food": "猫薄荷"}) == "猫薄荷不可食用。"
 
 
+def test_over_limit_feed_has_eat_too_much_message() -> None:
+    reply = format_feed_result(
+        {
+            "status": "success",
+            "food": "方便面",
+            "gain_kg": 1.0,
+            "current_weight_kg": 49.0,
+            "too_much": True,
+        }
+    )
+    assert reply == "吃不下啦，本次只按最大限制投喂，增加 1.00kg，当前体重 49.00kg。"
+
+
 @pytest.mark.asyncio
 async def test_commands_only_accept_group_messages_without_mention_requirement() -> None:
     event = fake_group_event(Message("/投喂汉堡"))

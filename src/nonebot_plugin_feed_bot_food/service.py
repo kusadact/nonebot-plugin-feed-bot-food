@@ -124,13 +124,17 @@ class FeedService:
             prune_state(state, moment, self.config.window_hours)
             self._sync_state(root, bot_id, state)
             await self.store.save(root)
-            return {
+            result = {
                 "status": "success",
                 "food": food,
                 "category": category.value,
                 "gain_kg": _json_number(gain),
                 "current_weight_kg": _json_number(state.current_weight),
+                "too_much": classification.too_much,
             }
+            if classification.too_much:
+                result["message"] = "吃不下啦，本次只按最大限制投喂。"
+            return result
 
     async def get_status(self, bot_id: str, moment: datetime | None = None) -> dict[str, Any]:
         moment = localize(moment or now_local())

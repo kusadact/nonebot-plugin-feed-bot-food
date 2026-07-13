@@ -51,6 +51,11 @@ def format_feed_result(result: dict[str, Any]) -> str | None:
     if status == "llm_error":
         return None
     if status == "success":
+        if result.get("too_much"):
+            return (
+                f"吃不下啦，本次只按最大限制投喂，增加 {float(result['gain_kg']):.2f}kg，"
+                f"当前体重 {float(result['current_weight_kg']):.2f}kg。"
+            )
         return (
             f"投喂{result['food']}成功，增加 {float(result['gain_kg']):.2f}kg，"
             f"当前体重 {float(result['current_weight_kg']):.2f}kg。"

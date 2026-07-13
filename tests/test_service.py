@@ -22,14 +22,20 @@ def moment(hour: int, minute: int = 0, day: int = 13) -> datetime:
 
 
 class FixedClassifier:
-    def __init__(self, category: FoodCategory = FoodCategory.MEAL, value: str = "0.62") -> None:
+    def __init__(
+        self,
+        category: FoodCategory = FoodCategory.MEAL,
+        value: str = "0.62",
+        too_much: bool = False,
+    ) -> None:
         self.category = category
         self.value = Decimal(value)
+        self.too_much = too_much
         self.calls = 0
 
     async def classify(self, food: str) -> Classification:
         self.calls += 1
-        return Classification(self.category, self.value)
+        return Classification(self.category, self.value, self.too_much)
 
 
 class FixedRng:
@@ -203,3 +209,18 @@ async def test_unknown_classification_returns_message_without_recording_feed() -
     assert state["current_weight"] == "48.00"
     assert state["total_feed_count"] == 0
     assert state["events"] == []
+
+
+@pytest.mark.asyncio
+async def test_over_limit_feed_is_capped_and_returns_eat_too_much_message() -> None:
+    with TemporaryDirectory() as directory:
+        service = service_for(
+            FixedClassifier(value="0.62", too_much=True),
+            Path(directory) / "state.json",
+        )
+        result = await service.feed("bot", "user", "16包方便面", moment(8))
+
+    assert result["status"] == "success"
+    assert result["too_much"] is True
+    assert result["gain_kg"] == 0.62
+    assert result["message"] == "吃不下啦，本次只按最大限制投喂。"

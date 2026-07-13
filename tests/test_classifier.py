@@ -52,6 +52,24 @@ def test_classifier_prompt_treats_multiple_foods_as_one_primary_category() -> No
     assert "多个食物或饮品" in prompt
     assert "只选择主要类别并返回一个 value" in prompt
     assert "不要拆分食物" in prompt
+    assert "too_much" in prompt
+    assert "截断为该类别的最大上限" in prompt
+
+
+@pytest.mark.asyncio
+async def test_classifier_marks_and_clamps_over_limit_food() -> None:
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"type":"meal","value":0.35,"too_much":true}'}}]},
+        )
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        result = await FoodClassifier(make_config(), client).classify("16包方便面和18个汉堡")
+
+    assert result.category == FoodCategory.MEAL
+    assert result.value == Decimal("1.00")
+    assert result.too_much is True
 
 
 @pytest.mark.asyncio
