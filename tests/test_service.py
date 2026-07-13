@@ -183,3 +183,23 @@ async def test_non_edible_returns_message_without_changing_state() -> None:
     assert state["current_weight"] == "48.00"
     assert state["total_feed_count"] == 0
     assert state["events"] == []
+
+
+@pytest.mark.asyncio
+async def test_unknown_classification_returns_message_without_recording_feed() -> None:
+    with TemporaryDirectory() as directory:
+        path = Path(directory) / "state.json"
+        classifier = FixedClassifier(FoodCategory.UNKNOWN)
+        service = service_for(classifier, path)
+        result = await service.feed("bot", "user", "未知物品", moment(8))
+        data = await JsonStateStore(path).load()
+
+    assert result == {
+        "status": "ignored",
+        "food": "未知物品",
+        "message": "无法确认这个食物的分类，未进行投喂。",
+    }
+    state = data["bots"]["bot"]
+    assert state["current_weight"] == "48.00"
+    assert state["total_feed_count"] == 0
+    assert state["events"] == []

@@ -45,8 +45,12 @@ def test_status_reply_has_only_requested_fields() -> None:
     ]
 
 
-def test_unknown_feed_is_silent() -> None:
-    assert format_feed_result({"status": "ignored"}) is None
+def test_unknown_feed_has_a_user_facing_message() -> None:
+    assert format_feed_result({"status": "ignored"}) == "无法确认这个食物的分类，未进行投喂。"
+
+
+def test_llm_error_is_silent() -> None:
+    assert format_feed_result({"status": "llm_error", "message": "上游失败"}) is None
 
 
 def test_empty_feed_has_a_user_facing_error() -> None:

@@ -47,6 +47,8 @@ def register_matchers(service: FeedService) -> None:
 def format_feed_result(result: dict[str, Any]) -> str | None:
     status = result.get("status")
     if status == "ignored":
+        return str(result.get("message", "无法确认这个食物的分类，未进行投喂。"))
+    if status == "llm_error":
         return None
     if status == "success":
         return (
@@ -57,7 +59,7 @@ def format_feed_result(result: dict[str, Any]) -> str | None:
         return f"{result['food']}不可食用。"
     if status == "invalid_food":
         return "请提供要投喂的食物。"
-    if status in {"request_limited", "category_limited", "llm_error"}:
+    if status in {"request_limited", "category_limited"}:
         return str(result.get("message", "投喂暂时不可用。"))
     return str(result.get("message", "投喂失败。"))
 

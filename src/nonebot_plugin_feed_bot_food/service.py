@@ -77,7 +77,11 @@ class FeedService:
             }
 
         if classification.category == FoodCategory.UNKNOWN or classification.value is None:
-            return {"status": "ignored", "food": food, "silent": True}
+            return {
+                "status": "ignored",
+                "food": food,
+                "message": "无法确认这个食物的分类，未进行投喂。",
+            }
         if classification.category == FoodCategory.NON_EDIBLE:
             return {
                 "status": "non_edible",
