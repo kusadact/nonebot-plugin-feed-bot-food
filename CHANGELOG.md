@@ -11,3 +11,7 @@
 - 增加固定窗口分类额度、LLM 请求硬上限和窗口边界槽位顺延。
 - 增加 JSON 持久化、每日 06:00 减重和离线结算补偿。
 - 增加可选的 groupmate-agent `feed_bot_food` 与 `get_feed_bot_status` Tools。
+
+### Fixed
+
+- 明确 LLM 对多个食物输入只按主要类别计算一次增重，不拆分为多个投喂。

@@ -47,6 +47,13 @@ async def test_classifier_unknown_is_not_an_error() -> None:
     assert result.value is None
 
 
+def test_classifier_prompt_treats_multiple_foods_as_one_primary_category() -> None:
+    prompt = FoodClassifier(make_config())._system_prompt()
+    assert "多个食物或饮品" in prompt
+    assert "只选择主要类别并返回一个 value" in prompt
+    assert "不要拆分食物" in prompt
+
+
 @pytest.mark.asyncio
 async def test_classifier_reports_http_error_without_secret() -> None:
     transport = httpx.MockTransport(

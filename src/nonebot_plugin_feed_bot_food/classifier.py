@@ -95,6 +95,8 @@ class FoodClassifier:
         return (
             "你是一个食物分类器。请根据用户给出的食物，把它归为 meal、water、snack、non_edible 或 unknown。"
             "meal 表示正餐或主食，water 表示水，snack 表示甜品/小食/零食，non_edible 表示不可食用。"
+            "如果用户输入包含多个食物或饮品，必须把它们作为一个整体判断，只选择主要类别并返回一个 value；"
+            "不要拆分食物，不要返回多个分类或多个 value。"
             "如果无法确定，必须返回 unknown。请根据食物和对应范围给出 value（单位 kg）："
             f"meal {meal[0]}-{meal[1]}，water {water[0]}-{water[1]}，snack {snack[0]}-{snack[1]}。"
             '只能返回 JSON 对象，格式为 {"type":"meal|water|snack|non_edible|unknown","value":0.00}，不要输出解释。'
