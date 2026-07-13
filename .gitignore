@@ -1,0 +1,13 @@
+AGENTS.md
+MEMORY.md
+PLAN.md
+
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
