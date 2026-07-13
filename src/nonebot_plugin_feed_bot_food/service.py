@@ -59,6 +59,7 @@ class FeedService:
                 "status": "llm_error",
                 "food": food,
                 "message": "LLM 未配置，请先配置 Base URL、API Key 和 Model",
+                "silent": True,
             }
 
         reservation = await self._reserve_llm_attempt(bot_id, user_id, moment)
@@ -68,7 +69,12 @@ class FeedService:
         try:
             classification = await self.classifier.classify(food)
         except ClassificationError as exc:
-            return {"status": "llm_error", "message": str(exc), "food": food}
+            return {
+                "status": "llm_error",
+                "message": str(exc),
+                "food": food,
+                "silent": True,
+            }
 
         if classification.category == FoodCategory.UNKNOWN or classification.value is None:
             return {"status": "ignored", "food": food, "silent": True}
@@ -76,7 +82,7 @@ class FeedService:
             return {
                 "status": "non_edible",
                 "food": food,
-                "message": "这个东西不可食用。",
+                "message": f"{food}不可食用。",
             }
 
         async with self.store.lock:

@@ -161,4 +161,25 @@ async def test_missing_llm_config_does_not_change_state() -> None:
         data = await JsonStateStore(path).load()
 
     assert result["status"] == "llm_error"
+    assert result["silent"] is True
     assert data["bots"] == {}
+
+
+@pytest.mark.asyncio
+async def test_non_edible_returns_message_without_changing_state() -> None:
+    with TemporaryDirectory() as directory:
+        path = Path(directory) / "state.json"
+        classifier = FixedClassifier(FoodCategory.NON_EDIBLE)
+        service = service_for(classifier, path)
+        result = await service.feed("bot", "user", "猫薄荷", moment(8))
+        data = await JsonStateStore(path).load()
+
+    assert result == {
+        "status": "non_edible",
+        "food": "猫薄荷",
+        "message": "猫薄荷不可食用。",
+    }
+    state = data["bots"]["bot"]
+    assert state["current_weight"] == "48.00"
+    assert state["total_feed_count"] == 0
+    assert state["events"] == []

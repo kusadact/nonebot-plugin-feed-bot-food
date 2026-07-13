@@ -53,6 +53,10 @@ def test_empty_feed_has_a_user_facing_error() -> None:
     assert format_feed_result({"status": "invalid_food"}) == "请提供要投喂的食物。"
 
 
+def test_non_edible_feed_has_a_user_facing_message() -> None:
+    assert format_feed_result({"status": "non_edible", "food": "猫薄荷"}) == "猫薄荷不可食用。"
+
+
 @pytest.mark.asyncio
 async def test_commands_only_accept_group_messages_without_mention_requirement() -> None:
     event = fake_group_event(Message("/投喂汉堡"))
