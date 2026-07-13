@@ -15,7 +15,7 @@ from .scheduler import register_scheduler
 from .service import FeedService
 from .storage import JsonStateStore
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 __plugin_meta__ = PluginMetadata(
     name="nonebot-plugin-feed-bot-food",
