@@ -1,53 +1,39 @@
 from __future__ import annotations
 
-import re
 from typing import Any
 
-from nonebot import on_message
+from nonebot import on_command
 from nonebot.adapters import Event
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message
 from nonebot.matcher import Matcher
+from nonebot.params import CommandArg
 
 from .service import FeedService
 
-FEED_PATTERN = re.compile(r"^\s*投喂\s*(?P<food>.*?)\s*$")
-STATUS_PATTERN = re.compile(r"^\s*(?:查看|查询)\s*(?:体重|投喂)(?:\s*状态)?\s*$")
 
-
-def _is_bot_mentioned(bot: Bot, event: GroupMessageEvent) -> bool:
-    bot_id = str(bot.self_id)
-    return any(
-        segment.type == "at" and str(segment.data.get("qq", "")) == bot_id
-        for segment in event.get_message()
-    )
-
-
-def _plain_text(event: GroupMessageEvent) -> str:
-    return event.get_message().extract_plain_text().strip()
-
-
-async def _feed_rule(bot: Bot, event: Event) -> bool:
-    return isinstance(event, GroupMessageEvent) and _is_bot_mentioned(bot, event) and bool(
-        FEED_PATTERN.fullmatch(_plain_text(event))
-    )
-
-
-async def _status_rule(bot: Bot, event: Event) -> bool:
-    return isinstance(event, GroupMessageEvent) and _is_bot_mentioned(bot, event) and bool(
-        STATUS_PATTERN.fullmatch(_plain_text(event))
-    )
+async def _group_only(event: Event) -> bool:
+    return isinstance(event, GroupMessageEvent)
 
 
 def register_matchers(service: FeedService) -> None:
-    feed_matcher = on_message(rule=_feed_rule, priority=5, block=True)
-    status_matcher = on_message(rule=_status_rule, priority=5, block=True)
+    feed_matcher = on_command("投喂", rule=_group_only, priority=5, block=True)
+    status_matcher = on_command(
+        "查看体重",
+        rule=_group_only,
+        aliases={"查看状态"},
+        priority=5,
+        block=True,
+    )
 
     @feed_matcher.handle()
-    async def handle_feed(bot: Bot, event: GroupMessageEvent, matcher: Matcher) -> None:
-        match = FEED_PATTERN.fullmatch(_plain_text(event))
-        if match is None:
-            return
-        result = await service.feed(str(bot.self_id), str(event.user_id), match.group("food"))
+    async def handle_feed(
+        bot: Bot,
+        event: GroupMessageEvent,
+        matcher: Matcher,
+        args: Message = CommandArg(),
+    ) -> None:
+        food = args.extract_plain_text().strip()
+        result = await service.feed(str(bot.self_id), str(event.user_id), food)
         reply = format_feed_result(result)
         if reply is not None:
             await matcher.finish(reply)

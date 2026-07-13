@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import pytest
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message, MessageSegment
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, Message
 from pydantic import create_model
 
-from nonebot_plugin_feed_bot_food.entry import _feed_rule, _status_rule, format_feed_result, format_status_result
+from nonebot_plugin_feed_bot_food.entry import _group_only, format_feed_result, format_status_result
 
 
 def fake_group_event(message: Message):
@@ -54,17 +54,9 @@ def test_empty_feed_has_a_user_facing_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_commands_require_bot_mention_and_group_message() -> None:
-    bot = Bot(None, "1")
-    event = fake_group_event(Message([MessageSegment.at("1"), MessageSegment.text(" 投喂汉堡")]))
-    assert await _feed_rule(bot, event)
-    assert not await _status_rule(bot, event)
+async def test_commands_only_accept_group_messages_without_mention_requirement() -> None:
+    event = fake_group_event(Message("/投喂汉堡"))
+    assert await _group_only(event)
 
-    empty_feed = fake_group_event(Message([MessageSegment.at("1"), MessageSegment.text(" 投喂")]))
-    assert await _feed_rule(bot, empty_feed)
-
-    status_event = fake_group_event(Message([MessageSegment.at("1"), MessageSegment.text(" 查看投喂状态")]))
-    assert await _status_rule(bot, status_event)
-
-    unmentioned = fake_group_event(Message("投喂汉堡"))
-    assert not await _feed_rule(bot, unmentioned)
+    status_event = fake_group_event(Message("/查看状态"))
+    assert await _group_only(status_event)
