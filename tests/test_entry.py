@@ -61,7 +61,7 @@ def test_non_edible_feed_has_a_user_facing_message() -> None:
     assert format_feed_result({"status": "non_edible", "food": "猫薄荷"}) == "猫薄荷不可食用。"
 
 
-def test_over_limit_feed_has_eat_too_much_message() -> None:
+def test_over_limit_feed_reports_actual_consumed_amount() -> None:
     reply = format_feed_result(
         {
             "status": "success",
@@ -71,7 +71,7 @@ def test_over_limit_feed_has_eat_too_much_message() -> None:
             "too_much": True,
         }
     )
-    assert reply == "吃不下啦，本次只按最大限制投喂，增加 1.00kg，当前体重 49.00kg。"
+    assert reply == "本次实际吃了 1.00kg，当前体重 49.00kg。"
 
 
 @pytest.mark.asyncio

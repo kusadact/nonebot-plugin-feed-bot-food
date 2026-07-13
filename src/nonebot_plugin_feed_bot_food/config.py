@@ -18,6 +18,7 @@ class FeedBotFoodConfig(BaseModel):
     window_hours: int = 6
     category_limits: tuple[int, int, int] = (1, 1, 1)
     category_gain_ranges: tuple[tuple[Decimal, Decimal], ...] = DEFAULT_GAIN_RANGES
+    gain_range_fluctuation: Decimal = Decimal("0.15")
     decay_fluctuation: Decimal = Decimal("0.10")
     enable_groupmate_agent: bool = True
     llm_base_url: str = ""
@@ -58,6 +59,13 @@ class FeedBotFoodConfig(BaseModel):
         for lower, upper in value:
             if lower < 0 or upper <= lower:
                 raise ValueError("each gain range must satisfy 0 <= lower < upper")
+        return value
+
+    @field_validator("gain_range_fluctuation")
+    @classmethod
+    def validate_gain_range_fluctuation(cls, value: Decimal) -> Decimal:
+        if value < 0:
+            raise ValueError("gain_range_fluctuation cannot be negative")
         return value
 
     @field_validator("decay_fluctuation")

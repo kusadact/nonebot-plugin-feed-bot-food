@@ -21,6 +21,7 @@ FEED_BOT_FOOD__INITIAL_WEIGHT=48.00
 FEED_BOT_FOOD__WINDOW_HOURS=6
 FEED_BOT_FOOD__CATEGORY_LIMITS=[1, 1, 1]
 FEED_BOT_FOOD__CATEGORY_GAIN_RANGES=[[0.30, 1.00], [0.05, 0.30], [0.10, 0.50]]
+FEED_BOT_FOOD__GAIN_RANGE_FLUCTUATION=0.15
 FEED_BOT_FOOD__DECAY_FLUCTUATION=0.10
 FEED_BOT_FOOD__ENABLE_GROUPMATE_AGENT=true
 FEED_BOT_FOOD__LLM_BASE_URL=https://api.openai.com/v1
@@ -34,6 +35,7 @@ FEED_BOT_FOOD__LLM_MODEL=
 - `WINDOW_HOURS`：固定投喂窗口长度，默认 6 小时。
 - `CATEGORY_LIMITS`：每名用户每个窗口各类食物的成功投喂次数，默认每类 1 次。
 - `CATEGORY_GAIN_RANGES`：LLM 返回的三类食物增重范围，单位为 kg。
+- `GAIN_RANGE_FLUCTUATION`：每次分类时对三类增重范围上下限分别施加的随机浮动，默认 `0.15kg`。
 - `DECAY_FLUCTUATION`：每日减重系数的浮动值，默认 `0.10`，即 `0.85～1.05`。
 - `ENABLE_GROUPMATE_AGENT`：是否注册 Agent Tool，默认开启；groupmate-agent 不可用时自动跳过。
 - `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`：OpenAI 兼容的食物分类接口。缺少任一项时插件仍能加载，但投喂不会修改体重。
@@ -63,7 +65,7 @@ FEED_BOT_FOOD__LLM_MODEL=
 
 食物交给 OpenAI 兼容 LLM 判断为正餐、水、甜品/小食或不可食用，并要求返回 JSON 分类和增重值。插件会校验并限制增重值在对应配置范围内。
 
-LLM 还会识别输入中的数量和重量。超过对应类别的单次上限时，返回 `too_much=true` 并把本次增重限制在最大值，Bot 会提示“吃不下啦”。
+LLM 还会识别输入中的数量和重量。超过对应类别的单次上限时，返回 `too_much=true` 并把本次增重限制在最大值；Agent 会根据实际增重值自行组织回复。
 
 “今日”统计区间为 Asia/Shanghai 时间 `06:00` 至次日 `05:59:59`。固定窗口默认是 `06-12`、`12-18`、`18-00`、`00-06`。
 

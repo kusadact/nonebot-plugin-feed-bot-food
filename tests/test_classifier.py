@@ -16,6 +16,31 @@ def make_config() -> FeedBotFoodConfig:
         llm_base_url="https://example.com/v1",
         llm_api_key=SecretStr("secret"),
         llm_model="test-model",
+        gain_range_fluctuation=Decimal("0"),
+    )
+
+
+def test_gain_range_fluctuation_defaults_to_fifteen_percent() -> None:
+    assert FeedBotFoodConfig().gain_range_fluctuation == Decimal("0.15")
+
+
+def test_effective_gain_ranges_randomize_each_bound() -> None:
+    class FixedRng:
+        def __init__(self) -> None:
+            self.values = iter((0.10, -0.10, 0.05, -0.05, 0.00, 0.15))
+
+        def uniform(self, lower: float, upper: float) -> float:
+            assert lower == -0.15
+            assert upper == 0.15
+            return next(self.values)
+
+    config = make_config().model_copy(update={"gain_range_fluctuation": Decimal("0.15")})
+    ranges = FoodClassifier(config, rng=FixedRng())._effective_gain_ranges()
+
+    assert ranges == (
+        (Decimal("0.40"), Decimal("0.90")),
+        (Decimal("0.10"), Decimal("0.25")),
+        (Decimal("0.10"), Decimal("0.65")),
     )
 
 
@@ -54,6 +79,7 @@ def test_classifier_prompt_treats_multiple_foods_as_one_primary_category() -> No
     assert "不要拆分食物" in prompt
     assert "too_much" in prompt
     assert "截断为该类别的最大上限" in prompt
+    assert "小幅随机变化" in prompt
 
 
 @pytest.mark.asyncio

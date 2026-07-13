@@ -132,8 +132,6 @@ class FeedService:
                 "current_weight_kg": _json_number(state.current_weight),
                 "too_much": classification.too_much,
             }
-            if classification.too_much:
-                result["message"] = "吃不下啦，本次只按最大限制投喂。"
             return result
 
     async def get_status(self, bot_id: str, moment: datetime | None = None) -> dict[str, Any]:

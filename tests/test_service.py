@@ -212,7 +212,7 @@ async def test_unknown_classification_returns_message_without_recording_feed() -
 
 
 @pytest.mark.asyncio
-async def test_over_limit_feed_is_capped_and_returns_eat_too_much_message() -> None:
+async def test_over_limit_feed_is_capped_without_fixed_message() -> None:
     with TemporaryDirectory() as directory:
         service = service_for(
             FixedClassifier(value="0.62", too_much=True),
@@ -223,4 +223,4 @@ async def test_over_limit_feed_is_capped_and_returns_eat_too_much_message() -> N
     assert result["status"] == "success"
     assert result["too_much"] is True
     assert result["gain_kg"] == 0.62
-    assert result["message"] == "吃不下啦，本次只按最大限制投喂。"
+    assert "message" not in result
