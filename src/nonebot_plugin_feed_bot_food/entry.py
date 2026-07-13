@@ -10,7 +10,7 @@ from nonebot.matcher import Matcher
 
 from .service import FeedService
 
-FEED_PATTERN = re.compile(r"^\s*投喂\s*(?P<food>.+?)\s*$")
+FEED_PATTERN = re.compile(r"^\s*投喂\s*(?P<food>.*?)\s*$")
 STATUS_PATTERN = re.compile(r"^\s*(?:查看|查询)\s*(?:体重|投喂)(?:\s*状态)?\s*$")
 
 

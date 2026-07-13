@@ -132,8 +132,8 @@ def next_category_retry(
         if active_carryovers:
             return min(localize(event.timestamp) + SLOT_DELAY for event in active_carryovers)
     next_start = start + timedelta(hours=config.window_hours)
-    retry = next_start
     guard_start = next_start - BOUNDARY_GUARD
+    next_window_carryovers = []
     for event in state.events:
         event_time = localize(event.timestamp)
         if (
@@ -141,8 +141,10 @@ def next_category_retry(
             and event.category == category
             and guard_start <= event_time < next_start
         ):
-            retry = max(retry, event_time + SLOT_DELAY)
-    return retry
+            next_window_carryovers.append(event_time + SLOT_DELAY)
+    if len(next_window_carryovers) >= limit and next_window_carryovers:
+        return min(next_window_carryovers)
+    return next_start
 
 
 def prune_state(state: BotState, moment: datetime, window_hours: int) -> None:

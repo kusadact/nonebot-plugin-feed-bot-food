@@ -49,12 +49,19 @@ def test_unknown_feed_is_silent() -> None:
     assert format_feed_result({"status": "ignored"}) is None
 
 
+def test_empty_feed_has_a_user_facing_error() -> None:
+    assert format_feed_result({"status": "invalid_food"}) == "请提供要投喂的食物。"
+
+
 @pytest.mark.asyncio
 async def test_commands_require_bot_mention_and_group_message() -> None:
     bot = Bot(None, "1")
     event = fake_group_event(Message([MessageSegment.at("1"), MessageSegment.text(" 投喂汉堡")]))
     assert await _feed_rule(bot, event)
     assert not await _status_rule(bot, event)
+
+    empty_feed = fake_group_event(Message([MessageSegment.at("1"), MessageSegment.text(" 投喂")]))
+    assert await _feed_rule(bot, empty_feed)
 
     status_event = fake_group_event(Message([MessageSegment.at("1"), MessageSegment.text(" 查看投喂状态")]))
     assert await _status_rule(bot, status_event)

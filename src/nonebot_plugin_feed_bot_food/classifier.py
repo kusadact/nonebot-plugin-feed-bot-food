@@ -40,11 +40,6 @@ _TYPE_ALIASES = {
 }
 
 
-def _redact(text: str) -> str:
-    text = re.sub(r"(?i)(api[_ -]?key|authorization|token)\s*[:=]\s*[^,\s}]+", r"\1=[REDACTED]", text)
-    return text[:240].strip()
-
-
 class FoodClassifier:
     def __init__(self, config: FeedBotFoodConfig, client: httpx.AsyncClient | None = None) -> None:
         self.config = config
@@ -80,8 +75,8 @@ class FoodClassifier:
         except httpx.HTTPError as exc:
             raise ClassificationError(f"LLM 网络请求失败：{exc}") from exc
 
-        if response.is_error:
-            detail = _redact(response.text) or response.reason_phrase
+        if not response.is_success:
+            detail = response.reason_phrase or "上游服务未成功处理请求"
             raise ClassificationError(f"LLM 请求失败（HTTP {response.status_code}）：{detail}")
 
         try:

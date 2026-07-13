@@ -57,9 +57,17 @@ def test_classifier_prompt_treats_multiple_foods_as_one_primary_category() -> No
 @pytest.mark.asyncio
 async def test_classifier_reports_http_error_without_secret() -> None:
     transport = httpx.MockTransport(
-        lambda request: httpx.Response(401, text="invalid api_key=secret")
+        lambda request: httpx.Response(401, text="Incorrect API key provided: secret-value")
     )
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(ClassificationError, match=r"HTTP 401") as error:
             await FoodClassifier(make_config(), client).classify("面包")
-    assert "secret" not in str(error.value)
+    assert "secret-value" not in str(error.value)
+
+
+@pytest.mark.asyncio
+async def test_classifier_treats_redirect_as_http_error() -> None:
+    transport = httpx.MockTransport(lambda request: httpx.Response(302, headers={"location": "/login"}))
+    async with httpx.AsyncClient(transport=transport) as client:
+        with pytest.raises(ClassificationError, match=r"HTTP 302"):
+            await FoodClassifier(make_config(), client).classify("面包")

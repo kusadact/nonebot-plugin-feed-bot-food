@@ -103,6 +103,23 @@ async def test_multiple_boundary_slots_recover_independently_without_new_delay()
 
 
 @pytest.mark.asyncio
+async def test_retry_uses_first_next_window_slot_release() -> None:
+    with TemporaryDirectory() as directory:
+        service = service_for(
+            FixedClassifier(FoodCategory.MEAL, "0.30"),
+            Path(directory) / "state.json",
+            category_limits=(2, 1, 1),
+        )
+        assert (await service.feed("bot", "user", "正餐", moment(16, 30)))['status'] == "success"
+        assert (await service.feed("bot", "user", "正餐", moment(17, 30)))['status'] == "success"
+
+        limited = await service.feed("bot", "user", "正餐", moment(17, 40))
+        assert limited["status"] == "category_limited"
+        assert limited["retry_at"].startswith("2026-07-13T18:00")
+        assert (await service.feed("bot", "user", "正餐", moment(18, 0)))['status'] == "success"
+
+
+@pytest.mark.asyncio
 async def test_status_only_contains_four_public_fields() -> None:
     with TemporaryDirectory() as directory:
         service = service_for(FixedClassifier(), Path(directory) / "state.json")
