@@ -84,6 +84,25 @@ async def test_boundary_slot_is_delayed_per_category() -> None:
 
 
 @pytest.mark.asyncio
+async def test_multiple_boundary_slots_recover_independently_without_new_delay() -> None:
+    with TemporaryDirectory() as directory:
+        path = Path(directory) / "state.json"
+        classifier = FixedClassifier(FoodCategory.MEAL, "0.30")
+        service = service_for(classifier, path, category_limits=(2, 1, 1))
+
+        assert (await service.feed("bot", "user", "正餐", moment(11, 30)))['status'] == "success"
+        assert (await service.feed("bot", "user", "正餐", moment(11, 50)))['status'] == "success"
+
+        first_recovered = await service.feed("bot", "user", "正餐", moment(13, 30))
+        assert first_recovered["status"] == "success"
+        assert (await service.feed("bot", "user", "正餐", moment(13, 40)))["status"] == "category_limited"
+        assert (await service.feed("bot", "user", "正餐", moment(13, 50)))['status'] == "success"
+
+        # 13:30/13:50 的新投喂不在 17:00-18:00 边界保护区，18:00 不应再次顺延。
+        assert (await service.feed("bot", "user", "正餐", moment(18, 0)))['status'] == "success"
+
+
+@pytest.mark.asyncio
 async def test_status_only_contains_four_public_fields() -> None:
     with TemporaryDirectory() as directory:
         service = service_for(FixedClassifier(), Path(directory) / "state.json")
