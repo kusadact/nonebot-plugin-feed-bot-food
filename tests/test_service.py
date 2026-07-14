@@ -100,6 +100,7 @@ async def test_status_contains_today_yesterday_and_total_fields() -> None:
         "today_feed_count": 1,
         "today_gain_kg": 0.62,
         "yesterday_feed_count": 0,
+        "yesterday_gain_kg": 0.0,
         "yesterday_weight_change_kg": 0.0,
         "total_feed_count": 1,
     }
@@ -119,6 +120,7 @@ async def test_daily_metabolism_uses_yesterday_intake_and_keeps_two_decimals() -
     assert result["today_feed_count"] == 0
     assert result["today_gain_kg"] == 0.0
     assert result["yesterday_feed_count"] == 1
+    assert result["yesterday_gain_kg"] == 0.5
     assert result["yesterday_weight_change_kg"] == -1.53
     assert result["total_feed_count"] == 1
 

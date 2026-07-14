@@ -28,24 +28,27 @@ def fake_group_event(message: Message):
     )
 
 
-def test_status_reply_contains_today_yesterday_and_total_fields() -> None:
+def test_status_reply_uses_requested_labels_and_bot_name() -> None:
     reply = format_status_result(
         {
             "current_weight_kg": 48.62,
-            "today_feed_count": 2,
-            "today_gain_kg": 0.72,
-            "yesterday_feed_count": 1,
-            "yesterday_weight_change_kg": -0.47,
-            "total_feed_count": 8,
-        }
+            "today_feed_count": 0,
+            "today_gain_kg": 0.00,
+            "yesterday_feed_count": 33,
+            "yesterday_gain_kg": 1.25,
+            "yesterday_weight_change_kg": 2.50,
+            "total_feed_count": 49,
+        },
+        "饭团",
     )
     assert reply.splitlines() == [
-        "当前体重：97.24斤",
-        "今日成功投喂次数：2",
-        "今日累计增加体重：1.44斤",
-        "昨日成功投喂总次数：1",
-        "昨日体重变化：-0.94斤",
-        "历史成功投喂总次数：8",
+        "饭团当前体重：97.24斤",
+        "今日投喂次数：0",
+        "今日累计摄入：0.00斤",
+        "昨日投喂次数：33",
+        "昨日体重变化：+5.00斤",
+        "昨日累计摄入：2.50斤",
+        "历史投喂次数：49",
     ]
 
 

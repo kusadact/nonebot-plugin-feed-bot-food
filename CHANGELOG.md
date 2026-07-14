@@ -6,6 +6,7 @@
 
 ### Changed
 
+- 调整 `/查看体重` 输出文案，增加 Bot 名称和昨日累计摄入，并统一投喂统计字段名称。
 - 新增 `FEED_BOT_FOOD__METABOLIC_POWER` 配置，默认指数调整为 `2.00`；状态查询中的重量单位改为斤。
 - 将每日结算改为基础代谢阈值和非线性摄入转换模型，并新增 `FEED_BOT_FOOD__METABOLIC_CONSTANT` 配置；移除旧的 `DECAY_FLUCTUATION` 配置。
 - 将 `FEED_BOT_FOOD__CATEGORY_LIMITS` 改为每个窗口的总成功投喂次数，不再按食物类别分别限额。

@@ -215,6 +215,7 @@ class FeedService:
                 "today_feed_count": daily.feed_count,
                 "today_gain_kg": _json_number(daily.gain),
                 "yesterday_feed_count": yesterday.feed_count,
+                "yesterday_gain_kg": _json_number(yesterday.gain),
                 "yesterday_weight_change_kg": _json_number(yesterday.weight_change),
                 "total_feed_count": state.total_feed_count,
             }

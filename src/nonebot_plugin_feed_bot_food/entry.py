@@ -48,7 +48,18 @@ def register_matchers(service: FeedService) -> None:
     @status_matcher.handle()
     async def handle_status(bot: Bot, event: GroupMessageEvent, matcher: Matcher) -> None:
         result = await service.get_status(str(bot.self_id))
-        await matcher.finish(format_status_result(result))
+        try:
+            login_info = await bot.call_api("get_login_info")
+        except Exception:
+            logger.warning(f"获取 Bot 昵称失败，使用 Bot ID: {bot.self_id}")
+            bot_name = str(bot.self_id)
+        else:
+            bot_name = (
+                str(login_info.get("nickname") or bot.self_id)
+                if isinstance(login_info, dict)
+                else str(bot.self_id)
+            )
+        await matcher.finish(format_status_result(result, bot_name))
 
 
 def format_feed_result(result: dict[str, Any]) -> str:
@@ -78,20 +89,22 @@ def format_feed_result(result: dict[str, Any]) -> str:
     return str(result.get("message", "投喂失败。"))
 
 
-def format_status_result(result: dict[str, Any]) -> str:
+def format_status_result(result: dict[str, Any], bot_name: str = "") -> str:
     current_weight = float(result["current_weight_kg"]) * KG_TO_JIN
     today_gain = float(result["today_gain_kg"]) * KG_TO_JIN
+    yesterday_gain = float(result["yesterday_gain_kg"]) * KG_TO_JIN
     yesterday_change = float(result["yesterday_weight_change_kg"]) * KG_TO_JIN
     formatted_yesterday_change = (
         f"{yesterday_change:.2f}" if yesterday_change == 0 else f"{yesterday_change:+.2f}"
     )
     return "\n".join(
         [
-            f"当前体重：{current_weight:.2f}斤",
-            f"今日成功投喂次数：{int(result['today_feed_count'])}",
-            f"今日累计增加体重：{today_gain:.2f}斤",
-            f"昨日成功投喂总次数：{int(result['yesterday_feed_count'])}",
+            f"{bot_name}当前体重：{current_weight:.2f}斤",
+            f"今日投喂次数：{int(result['today_feed_count'])}",
+            f"今日累计摄入：{today_gain:.2f}斤",
+            f"昨日投喂次数：{int(result['yesterday_feed_count'])}",
             f"昨日体重变化：{formatted_yesterday_change}斤",
-            f"历史成功投喂总次数：{int(result['total_feed_count'])}",
+            f"昨日累计摄入：{yesterday_gain:.2f}斤",
+            f"历史投喂次数：{int(result['total_feed_count'])}",
         ]
     )
