@@ -11,3 +11,6 @@ __pycache__/
 .AppleDouble
 .LSOverride
 ._*
+
+# Local formula test utility
+weight_calculator.py
