@@ -55,6 +55,8 @@ FEED_BOT_FOOD__LLM_MODEL=
 - 当前体重
 - 今日成功投喂次数
 - 今日累计增加体重
+- 昨日成功投喂总次数
+- 昨日体重变化（昨日增加体重减去 06:00 结算减重）
 - 历史成功投喂总次数
 
 私聊不会触发这些命令；`/查看体重` 和 `/查看状态` 是同一个命令的两个名称。
@@ -93,13 +95,15 @@ ceil(CATEGORY_LIMITS × 1.5)
 插件通过 groupmate-agent 的注册接口提供两个 Tool：
 
 - `feed_bot_food(food)`：执行投喂并返回分类、增重和当前体重。
-- `get_feed_bot_status()`：返回当前体重、今日投喂次数、今日增重和历史总次数。
+- `get_feed_bot_status()`：返回当前体重、今日和昨日投喂统计及历史总次数。
 
 Tool 只返回结构化 JSON，不直接发送 OneBot 消息；只要 `feed_bot_food` 已被调用，Agent 必须依据结果调用 `reply_user` 回复，不能调用 `finish` 后静默。Agent Tool 只在群聊上下文提供，groupmate-agent 未安装、未加载或集成关闭时，直接群聊命令仍可用。若 Agent 宿主在工具调用前就判定普通消息无需参与，则不会发生投喂，也不属于插件已处理的投喂请求。
 
 ## 数据文件
 
 状态保存在 NoneBot 插件标准数据目录的 `state.json` 中。数据按 Bot ID 分区，使用原子写入和进程内锁保护并发更新。
+
+当前状态文件格式为 schema v2。首次读取 schema v1 文件时，插件会补齐每日体重变化字段并立即原子写回 v2；后续版本将移除对 schema v1 的兼容。
 
 ## 开发
 

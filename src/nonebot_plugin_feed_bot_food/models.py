@@ -56,15 +56,21 @@ class FeedEvent:
 class DailyStats:
     feed_count: int = 0
     gain: Decimal = Decimal("0.00")
+    weight_change: Decimal = Decimal("0.00")
 
     def to_dict(self) -> dict[str, Any]:
-        return {"feed_count": self.feed_count, "gain": format(self.gain, ".2f")}
+        return {
+            "feed_count": self.feed_count,
+            "gain": format(self.gain, ".2f"),
+            "weight_change": format(self.weight_change, ".2f"),
+        }
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> DailyStats:
         return cls(
             feed_count=int(value.get("feed_count", 0)),
             gain=quantize_weight(Decimal(str(value.get("gain", "0")))),
+            weight_change=quantize_weight(Decimal(str(value.get("weight_change", "0")))),
         )
 
 

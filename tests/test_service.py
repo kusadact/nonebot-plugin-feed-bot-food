@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -93,7 +94,7 @@ async def test_window_boundary_has_no_protection_delay() -> None:
 
 
 @pytest.mark.asyncio
-async def test_status_only_contains_four_public_fields() -> None:
+async def test_status_contains_today_yesterday_and_total_fields() -> None:
     with TemporaryDirectory() as directory:
         service = service_for(FixedClassifier(), Path(directory) / "state.json")
         await service.feed("bot", "user", "饭", moment(8))
@@ -104,6 +105,8 @@ async def test_status_only_contains_four_public_fields() -> None:
         "current_weight_kg": 48.62,
         "today_feed_count": 1,
         "today_gain_kg": 0.62,
+        "yesterday_feed_count": 0,
+        "yesterday_weight_change_kg": 0.0,
         "total_feed_count": 1,
     }
 
@@ -121,7 +124,41 @@ async def test_daily_decay_uses_yesterday_gain_and_keeps_two_decimals() -> None:
     assert result["current_weight_kg"] == 48.03
     assert result["today_feed_count"] == 0
     assert result["today_gain_kg"] == 0.0
+    assert result["yesterday_feed_count"] == 1
+    assert result["yesterday_weight_change_kg"] == 0.03
     assert result["total_feed_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_legacy_state_is_migrated_and_written_as_schema_v2() -> None:
+    with TemporaryDirectory() as directory:
+        path = Path(directory) / "state.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "bots": {
+                        "bot": {
+                            "initial_weight": "48.00",
+                            "current_weight": "48.50",
+                            "total_feed_count": 1,
+                            "daily": {"2026-07-12": {"feed_count": 1, "gain": "0.50"}},
+                            "events": [],
+                            "user_attempts": {},
+                            "last_settled_date": "2026-07-12",
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        data = await JsonStateStore(path).load()
+        written = json.loads(path.read_text(encoding="utf-8"))
+
+    assert data["schema_version"] == 2
+    assert data["bots"]["bot"]["daily"]["2026-07-12"]["weight_change"] == "0.00"
+    assert written == data
 
 
 @pytest.mark.asyncio

@@ -51,7 +51,7 @@ def register_agent_tools(service: FeedService) -> bool:
 
         @tool("get_feed_bot_status")
         async def get_feed_bot_status() -> str:
-            """获取当前 Bot 的体重、今日投喂次数、今日增重和历史投喂总次数。"""
+            """获取当前 Bot 的体重、今日和昨日投喂统计及历史投喂总次数。"""
             result = await service.get_status(ctx.bot_id or "")
             return json.dumps(result, ensure_ascii=False)
 

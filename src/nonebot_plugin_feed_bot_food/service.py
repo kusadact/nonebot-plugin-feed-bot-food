@@ -183,6 +183,10 @@ class FeedService:
             state, created = self._get_state(root, bot_id, moment)
             changed = self._settle_state(state, moment)
             daily = state.daily.get(today_key(moment), DailyStats())
+            yesterday_key = (
+                date.fromisoformat(today_key(moment)) - timedelta(days=1)
+            ).isoformat()
+            yesterday = state.daily.get(yesterday_key, DailyStats())
             if changed or created:
                 self._sync_state(root, bot_id, state)
                 await self.store.save(root)
@@ -191,6 +195,8 @@ class FeedService:
                 "current_weight_kg": _json_number(state.current_weight),
                 "today_feed_count": daily.feed_count,
                 "today_gain_kg": _json_number(daily.gain),
+                "yesterday_feed_count": yesterday.feed_count,
+                "yesterday_weight_change_kg": _json_number(yesterday.weight_change),
                 "total_feed_count": state.total_feed_count,
             }
 
@@ -254,18 +260,23 @@ class FeedService:
         changed = False
         while last_settled < yesterday:
             target = last_settled + timedelta(days=1)
-            daily = state.daily.get(target.isoformat(), DailyStats())
-            if daily.gain > 0 and state.current_weight > 0:
+            daily = state.daily.get(target.isoformat())
+            daily_gain = daily.gain if daily is not None else Decimal("0.00")
+            weight_before_settle = state.current_weight
+            if daily_gain > 0 and state.current_weight > 0:
                 lower = Decimal("0.95") - self.config.decay_fluctuation
                 upper = Decimal("0.95") + self.config.decay_fluctuation
                 coefficient = Decimal(str(self.rng.uniform(float(lower), float(upper))))
                 loss = quantize_weight(
-                    daily.gain * coefficient * (state.initial_weight / state.current_weight)
+                    daily_gain * coefficient * (state.initial_weight / state.current_weight)
                 )
                 state.current_weight = max(
                     Decimal("35.00"),
                     quantize_weight(state.current_weight - loss),
                 )
+            if daily is not None:
+                actual_loss = quantize_weight(weight_before_settle - state.current_weight)
+                daily.weight_change = quantize_weight(daily_gain - actual_loss)
             last_settled = target
             state.last_settled_date = target.isoformat()
             changed = True

@@ -28,12 +28,14 @@ def fake_group_event(message: Message):
     )
 
 
-def test_status_reply_has_only_requested_fields() -> None:
+def test_status_reply_contains_today_yesterday_and_total_fields() -> None:
     reply = format_status_result(
         {
             "current_weight_kg": 48.62,
             "today_feed_count": 2,
             "today_gain_kg": 0.72,
+            "yesterday_feed_count": 1,
+            "yesterday_weight_change_kg": -0.47,
             "total_feed_count": 8,
         }
     )
@@ -41,6 +43,8 @@ def test_status_reply_has_only_requested_fields() -> None:
         "当前体重：48.62kg",
         "今日成功投喂次数：2",
         "今日累计增加体重：0.72kg",
+        "昨日成功投喂总次数：1",
+        "昨日体重变化：-0.47kg",
         "历史成功投喂总次数：8",
     ]
 

@@ -8,7 +8,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+LEGACY_SCHEMA_VERSION = 1
 
 
 class StateStorageError(RuntimeError):
@@ -51,9 +52,15 @@ class JsonStateStore:
             version = int(data.get("schema_version", 1))
         except (TypeError, ValueError) as exc:
             raise StateStorageError("JSON 状态版本格式无效") from exc
-        if version != SCHEMA_VERSION:
+        migrated = False
+        if version == LEGACY_SCHEMA_VERSION:
+            data = _migrate_v1_to_v2(data)
+            migrated = True
+        elif version != SCHEMA_VERSION:
             raise StateStorageError(f"不支持的 JSON 状态版本: {version}")
         data.setdefault("schema_version", SCHEMA_VERSION)
+        if migrated:
+            await self.save(data)
         return data
 
     async def save(self, data: dict[str, Any]) -> None:
@@ -86,3 +93,19 @@ class JsonStateStore:
                     os.unlink(temporary_path)
                 except OSError:
                     pass
+
+
+def _migrate_v1_to_v2(data: dict[str, Any]) -> dict[str, Any]:
+    bots = data.get("bots", {})
+    for raw_state in bots.values():
+        if not isinstance(raw_state, dict):
+            raise StateStorageError("JSON 状态中的 Bot 数据格式无效")
+        daily = raw_state.get("daily", {})
+        if not isinstance(daily, dict):
+            raise StateStorageError("JSON 状态中的每日统计格式无效")
+        for raw_daily in daily.values():
+            if not isinstance(raw_daily, dict):
+                raise StateStorageError("JSON 状态中的每日统计项格式无效")
+            raw_daily.setdefault("weight_change", "0.00")
+    data["schema_version"] = SCHEMA_VERSION
+    return data
