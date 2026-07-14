@@ -15,11 +15,11 @@ class FeedBotFoodConfig(BaseModel):
     """Configuration scoped under ``feed_bot_food__``."""
 
     initial_weight: Decimal = Decimal("48.00")
+    metabolic_constant: Decimal = Decimal("5.00")
     window_hours: int = 6
     category_limits: int = 3
     category_gain_ranges: tuple[tuple[Decimal, Decimal], ...] = DEFAULT_GAIN_RANGES
     gain_range_fluctuation: Decimal = Decimal("0.15")
-    decay_fluctuation: Decimal = Decimal("0.10")
     enable_groupmate_agent: bool = True
     llm_base_url: str = ""
     llm_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""))
@@ -28,8 +28,15 @@ class FeedBotFoodConfig(BaseModel):
     @field_validator("initial_weight")
     @classmethod
     def validate_initial_weight(cls, value: Decimal) -> Decimal:
-        if value <= Decimal("35.00"):
-            raise ValueError("initial_weight must be greater than 35.00")
+        if value <= 0:
+            raise ValueError("initial_weight must be greater than 0")
+        return value
+
+    @field_validator("metabolic_constant")
+    @classmethod
+    def validate_metabolic_constant(cls, value: Decimal) -> Decimal:
+        if value <= 0:
+            raise ValueError("metabolic_constant must be greater than 0")
         return value
 
     @field_validator("window_hours")
@@ -64,13 +71,6 @@ class FeedBotFoodConfig(BaseModel):
     def validate_gain_range_fluctuation(cls, value: Decimal) -> Decimal:
         if value < 0:
             raise ValueError("gain_range_fluctuation cannot be negative")
-        return value
-
-    @field_validator("decay_fluctuation")
-    @classmethod
-    def validate_decay_fluctuation(cls, value: Decimal) -> Decimal:
-        if value < 0 or value >= Decimal("0.95"):
-            raise ValueError("decay_fluctuation must be between 0 and 0.95")
         return value
 
     @property

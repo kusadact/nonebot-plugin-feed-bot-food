@@ -6,6 +6,7 @@
 
 ### Changed
 
+- 将每日结算改为基础代谢阈值和非线性摄入转换模型，并新增 `FEED_BOT_FOOD__METABOLIC_CONSTANT` 配置；移除旧的 `DECAY_FLUCTUATION` 配置。
 - 将 `FEED_BOT_FOOD__CATEGORY_LIMITS` 改为每个窗口的总成功投喂次数，不再按食物类别分别限额。
 - 将 LLM 请求硬上限改为总投喂次数的 `1.5` 倍向上取整。
 - 移除窗口边界保护区和分类槽位顺延规则。

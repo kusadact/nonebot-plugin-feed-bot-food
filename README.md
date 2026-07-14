@@ -18,11 +18,11 @@ uv add nonebot-plugin-feed-bot-food
 
 ```dotenv
 FEED_BOT_FOOD__INITIAL_WEIGHT=48.00
+FEED_BOT_FOOD__METABOLIC_CONSTANT=5.00
 FEED_BOT_FOOD__WINDOW_HOURS=6
 FEED_BOT_FOOD__CATEGORY_LIMITS=3
 FEED_BOT_FOOD__CATEGORY_GAIN_RANGES=[[0.30, 1.00], [0.05, 0.30], [0.10, 0.50]]
 FEED_BOT_FOOD__GAIN_RANGE_FLUCTUATION=0.15
-FEED_BOT_FOOD__DECAY_FLUCTUATION=0.10
 FEED_BOT_FOOD__ENABLE_GROUPMATE_AGENT=true
 FEED_BOT_FOOD__LLM_BASE_URL=https://api.openai.com/v1
 FEED_BOT_FOOD__LLM_API_KEY=
@@ -30,15 +30,15 @@ FEED_BOT_FOOD__LLM_MODEL=
 ```
 
 - `INITIAL_WEIGHT`：首次创建某个 Bot 状态时的初始体重，默认 `48.00kg`。
+- `METABOLIC_CONSTANT`：标准体重下的基础代谢阈值 `M`，默认 `5.00`。它和每日食物增重使用相同单位。
 - `WINDOW_HOURS`：固定投喂窗口长度，默认 6 小时。
 - `CATEGORY_LIMITS`：每名用户每个窗口所有类别合计的成功投喂次数，默认 3 次。虽然配置名沿用旧名称，但值现在是单个整数。
 - `CATEGORY_GAIN_RANGES`：LLM 返回的三类食物增重范围，单位为 kg。
 - `GAIN_RANGE_FLUCTUATION`：每次分类时对三类增重范围上下限分别施加的随机浮动，默认 `0.15kg`。
-- `DECAY_FLUCTUATION`：每日减重系数的浮动值，默认 `0.10`，即 `0.85～1.05`。
 - `ENABLE_GROUPMATE_AGENT`：是否注册 Agent Tool，默认开启；groupmate-agent 不可用时自动跳过。
 - `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`：OpenAI 兼容的食物分类接口。缺少任一项时插件仍能加载，但投喂不会修改体重，并会返回配置提示。
 
-最低体重固定为 `35.00kg`，每天 Asia/Shanghai 时间 `06:00` 结算昨日体重，不作为配置项。
+最低体重固定为 `0.00kg`，每天 Asia/Shanghai 时间 `06:00` 结算昨日体重，不作为配置项。
 
 ## 群聊命令
 
@@ -56,7 +56,7 @@ FEED_BOT_FOOD__LLM_MODEL=
 - 今日成功投喂次数
 - 今日累计增加体重
 - 昨日成功投喂总次数
-- 昨日体重变化（昨日增加体重减去 06:00 结算减重）
+- 昨日净体重变化（摄入和基础代谢结算后的实际变化）
 - 历史成功投喂总次数
 
 私聊不会触发这些命令；`/查看体重` 和 `/查看状态` 是同一个命令的两个名称。
@@ -81,14 +81,18 @@ ceil(CATEGORY_LIMITS × 1.5)
 
 只要投喂请求已经进入插件，成功、不可食用、无法分类、限流、配置错误和服务失败都会返回一条用户可见提示，不会静默结束。
 
-每日减重公式为：
+每日结算公式为：
 
 ```text
-减重 = 昨日实际增加体重 × random(0.95 - 浮动值, 0.95 + 浮动值)
-      × (初始体重 / 当前体重)
+a = M × (当前体重 / 初始体重)^4
+d = 昨日实际摄入 - a
+体重变化 = 7.8541 × sign(d) × (1 - exp(-|d| / 20.7809))
+结算后体重 = 当前体重 + 体重变化
 ```
 
-减重后体重不会低于 `35.00kg`。Bot 离线时，重新连接后会补做尚未结算的日期，且同一天只结算一次。
+其中 `M` 由 `METABOLIC_CONSTANT` 配置，默认 `5.00`；公式中的 `4`、`7.8541` 和 `20.7809` 是插件内置的模型参数，不作为配置项。摄入量超过代谢阈值后，体重增加会逐渐趋于饱和；摄入不足时则会减重。
+
+结算后体重不会低于 `0.00kg`。Bot 离线时，重新连接后会补做尚未结算的日期，且同一天只结算一次。
 
 ## groupmate-agent 集成
 

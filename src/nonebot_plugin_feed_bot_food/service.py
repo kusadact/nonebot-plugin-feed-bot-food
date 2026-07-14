@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import random
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -28,10 +27,32 @@ LOGGER = logging.getLogger(__name__)
 LLM_NOT_CONFIGURED_MESSAGE = "投喂功能暂时不可用，请先配置食物分类服务。"
 LLM_FAILED_MESSAGE = "投喂暂时失败，请稍后再试。"
 INTERNAL_ERROR_MESSAGE = "投喂暂时失败，请稍后再试。"
+METABOLIC_POWER = 4
+SATURATION_LIMIT = Decimal("7.8541")
+SATURATION_SCALE = Decimal("20.7809")
+MIN_WEIGHT = Decimal("0.00")
 
 
 def _json_number(value: Decimal) -> float:
     return float(quantize_weight(value))
+
+
+def _metabolic_threshold(
+    current_weight: Decimal,
+    standard_weight: Decimal,
+    metabolic_constant: Decimal,
+) -> Decimal:
+    ratio = current_weight / standard_weight
+    return metabolic_constant * (ratio**METABOLIC_POWER)
+
+
+def _nonlinear_weight_change(surplus: Decimal) -> Decimal:
+    if surplus == 0:
+        return Decimal("0.00")
+    magnitude = SATURATION_LIMIT * (
+        Decimal("1") - (-abs(surplus) / SATURATION_SCALE).exp()
+    )
+    return magnitude if surplus > 0 else -magnitude
 
 
 class FeedService:
@@ -40,12 +61,10 @@ class FeedService:
         config: FeedBotFoodConfig,
         store: JsonStateStore,
         classifier: FoodClassifier,
-        rng: random.Random | None = None,
     ) -> None:
         self.config = config
         self.store = store
         self.classifier = classifier
-        self.rng = rng or random.Random()
 
     async def feed(
         self,
@@ -258,26 +277,41 @@ class FeedService:
             return True
         last_settled = date.fromisoformat(state.last_settled_date)
         changed = False
+
+        # Feeding is recorded immediately in current_weight. Remove all
+        # unsettled intake first, then apply each day's net metabolism once.
+        unsettled_gain = Decimal("0.00")
+        cursor = last_settled + timedelta(days=1)
+        while cursor <= current_day:
+            daily = state.daily.get(cursor.isoformat())
+            if daily is not None:
+                unsettled_gain += daily.gain
+            cursor += timedelta(days=1)
+        working_weight = quantize_weight(state.current_weight - unsettled_gain)
+
         while last_settled < yesterday:
             target = last_settled + timedelta(days=1)
             daily = state.daily.get(target.isoformat())
             daily_gain = daily.gain if daily is not None else Decimal("0.00")
-            weight_before_settle = state.current_weight
-            if daily_gain > 0 and state.current_weight > 0:
-                lower = Decimal("0.95") - self.config.decay_fluctuation
-                upper = Decimal("0.95") + self.config.decay_fluctuation
-                coefficient = Decimal(str(self.rng.uniform(float(lower), float(upper))))
-                loss = quantize_weight(
-                    daily_gain * coefficient * (state.initial_weight / state.current_weight)
-                )
-                state.current_weight = max(
-                    Decimal("35.00"),
-                    quantize_weight(state.current_weight - loss),
-                )
-            if daily is not None:
-                actual_loss = quantize_weight(weight_before_settle - state.current_weight)
-                daily.weight_change = quantize_weight(daily_gain - actual_loss)
+            threshold = _metabolic_threshold(
+                working_weight,
+                state.initial_weight,
+                self.config.metabolic_constant,
+            )
+            surplus = daily_gain - threshold
+            weight_change = quantize_weight(_nonlinear_weight_change(surplus))
+            weight_before_settle = working_weight
+            working_weight = max(
+                MIN_WEIGHT,
+                quantize_weight(working_weight + weight_change),
+            )
+            daily = state.daily.setdefault(target.isoformat(), DailyStats())
+            daily.weight_change = quantize_weight(working_weight - weight_before_settle)
             last_settled = target
             state.last_settled_date = target.isoformat()
             changed = True
+
+        today = state.daily.get(current_day.isoformat())
+        today_gain = today.gain if today is not None else Decimal("0.00")
+        state.current_weight = quantize_weight(working_weight + today_gain)
         return changed

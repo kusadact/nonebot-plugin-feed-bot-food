@@ -21,7 +21,7 @@ def register_scheduler(service: FeedService) -> None:
             try:
                 await service.settle(str(bot_id))
             except Exception:
-                logger.exception(f"投喂 Bot 每日减重结算失败: bot_id={bot_id}")
+                logger.exception(f"投喂 Bot 每日体重结算失败: bot_id={bot_id}")
 
     @get_driver().on_bot_connect
     async def on_bot_connect(bot: Bot) -> None:

@@ -44,21 +44,11 @@ class BrokenClassifier:
         raise RuntimeError("classifier crashed")
 
 
-class FixedRng:
-    def __init__(self, value: float) -> None:
-        self.value = value
-
-    def uniform(self, lower: float, upper: float) -> float:
-        assert lower <= self.value <= upper
-        return self.value
-
-
 def service_for(classifier: FixedClassifier, path: Path, **kwargs: object) -> FeedService:
     return FeedService(
         FeedBotFoodConfig(**kwargs),
         JsonStateStore(path),
         classifier,
-        rng=FixedRng(0.95),
     )
 
 
@@ -112,7 +102,7 @@ async def test_status_contains_today_yesterday_and_total_fields() -> None:
 
 
 @pytest.mark.asyncio
-async def test_daily_decay_uses_yesterday_gain_and_keeps_two_decimals() -> None:
+async def test_daily_metabolism_uses_yesterday_intake_and_keeps_two_decimals() -> None:
     with TemporaryDirectory() as directory:
         service = service_for(
             FixedClassifier(value="0.50"),
@@ -121,12 +111,40 @@ async def test_daily_decay_uses_yesterday_gain_and_keeps_two_decimals() -> None:
         await service.feed("bot", "user", "饭", moment(12, day=12))
         result = await service.get_status("bot", moment(6, day=13))
 
-    assert result["current_weight_kg"] == 48.03
+    assert result["current_weight_kg"] == 46.47
     assert result["today_feed_count"] == 0
     assert result["today_gain_kg"] == 0.0
     assert result["yesterday_feed_count"] == 1
-    assert result["yesterday_weight_change_kg"] == 0.03
+    assert result["yesterday_weight_change_kg"] == -1.53
     assert result["total_feed_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_standard_weight_is_stable_when_intake_matches_metabolism() -> None:
+    with TemporaryDirectory() as directory:
+        service = service_for(
+            FixedClassifier(value="5.00"),
+            Path(directory) / "state.json",
+        )
+        await service.feed("bot", "user", "饭", moment(12, day=12))
+        result = await service.get_status("bot", moment(6, day=13))
+
+    assert result["current_weight_kg"] == 48.00
+    assert result["yesterday_weight_change_kg"] == 0.00
+
+
+@pytest.mark.asyncio
+async def test_large_intake_uses_nonlinear_weight_change() -> None:
+    with TemporaryDirectory() as directory:
+        service = service_for(
+            FixedClassifier(value="15.00"),
+            Path(directory) / "state.json",
+        )
+        await service.feed("bot", "user", "饭", moment(12, day=12))
+        result = await service.get_status("bot", moment(6, day=13))
+
+    assert result["current_weight_kg"] == 51.00
+    assert result["yesterday_weight_change_kg"] == 3.00
 
 
 @pytest.mark.asyncio
