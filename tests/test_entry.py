@@ -40,11 +40,11 @@ def test_status_reply_contains_today_yesterday_and_total_fields() -> None:
         }
     )
     assert reply.splitlines() == [
-        "当前体重：48.62kg",
+        "当前体重：97.24斤",
         "今日成功投喂次数：2",
-        "今日累计增加体重：0.72kg",
+        "今日累计增加体重：1.44斤",
         "昨日成功投喂总次数：1",
-        "昨日体重变化：-0.47kg",
+        "昨日体重变化：-0.94斤",
         "历史成功投喂总次数：8",
     ]
 

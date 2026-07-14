@@ -18,6 +18,10 @@ from nonebot_plugin_feed_bot_food.storage import JsonStateStore
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
+def test_metabolic_power_defaults_to_two() -> None:
+    assert FeedBotFoodConfig().metabolic_power == Decimal("2.00")
+
+
 def moment(hour: int, minute: int = 0, day: int = 13) -> datetime:
     return datetime(2026, 7, day, hour, minute, tzinfo=SHANGHAI)
 

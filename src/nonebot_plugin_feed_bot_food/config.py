@@ -16,6 +16,7 @@ class FeedBotFoodConfig(BaseModel):
 
     initial_weight: Decimal = Decimal("48.00")
     metabolic_constant: Decimal = Decimal("5.00")
+    metabolic_power: Decimal = Decimal("2.00")
     window_hours: int = 6
     category_limits: int = 3
     category_gain_ranges: tuple[tuple[Decimal, Decimal], ...] = DEFAULT_GAIN_RANGES
@@ -37,6 +38,13 @@ class FeedBotFoodConfig(BaseModel):
     def validate_metabolic_constant(cls, value: Decimal) -> Decimal:
         if value <= 0:
             raise ValueError("metabolic_constant must be greater than 0")
+        return value
+
+    @field_validator("metabolic_power")
+    @classmethod
+    def validate_metabolic_power(cls, value: Decimal) -> Decimal:
+        if value <= 0:
+            raise ValueError("metabolic_power must be greater than 0")
         return value
 
     @field_validator("window_hours")

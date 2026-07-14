@@ -10,6 +10,8 @@ from nonebot.params import CommandArg
 
 from .service import FeedService
 
+KG_TO_JIN = 2.0
+
 
 async def _group_only(event: Event) -> bool:
     return isinstance(event, GroupMessageEvent)
@@ -77,17 +79,19 @@ def format_feed_result(result: dict[str, Any]) -> str:
 
 
 def format_status_result(result: dict[str, Any]) -> str:
-    yesterday_change = float(result["yesterday_weight_change_kg"])
+    current_weight = float(result["current_weight_kg"]) * KG_TO_JIN
+    today_gain = float(result["today_gain_kg"]) * KG_TO_JIN
+    yesterday_change = float(result["yesterday_weight_change_kg"]) * KG_TO_JIN
     formatted_yesterday_change = (
         f"{yesterday_change:.2f}" if yesterday_change == 0 else f"{yesterday_change:+.2f}"
     )
     return "\n".join(
         [
-            f"当前体重：{float(result['current_weight_kg']):.2f}kg",
+            f"当前体重：{current_weight:.2f}斤",
             f"今日成功投喂次数：{int(result['today_feed_count'])}",
-            f"今日累计增加体重：{float(result['today_gain_kg']):.2f}kg",
+            f"今日累计增加体重：{today_gain:.2f}斤",
             f"昨日成功投喂总次数：{int(result['yesterday_feed_count'])}",
-            f"昨日体重变化：{formatted_yesterday_change}kg",
+            f"昨日体重变化：{formatted_yesterday_change}斤",
             f"历史成功投喂总次数：{int(result['total_feed_count'])}",
         ]
     )

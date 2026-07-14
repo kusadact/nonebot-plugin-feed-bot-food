@@ -19,6 +19,7 @@ uv add nonebot-plugin-feed-bot-food
 ```dotenv
 FEED_BOT_FOOD__INITIAL_WEIGHT=48.00
 FEED_BOT_FOOD__METABOLIC_CONSTANT=5.00
+FEED_BOT_FOOD__METABOLIC_POWER=2.00
 FEED_BOT_FOOD__WINDOW_HOURS=6
 FEED_BOT_FOOD__CATEGORY_LIMITS=3
 FEED_BOT_FOOD__CATEGORY_GAIN_RANGES=[[0.30, 1.00], [0.05, 0.30], [0.10, 0.50]]
@@ -31,6 +32,7 @@ FEED_BOT_FOOD__LLM_MODEL=
 
 - `INITIAL_WEIGHT`：首次创建某个 Bot 状态时的初始体重，默认 `48.00kg`。
 - `METABOLIC_CONSTANT`：标准体重下的基础代谢阈值 `M`，默认 `5.00`。它和每日食物增重使用相同单位。
+- `METABOLIC_POWER`：基础代谢阈值中的非线性指数 `p`，默认 `2.00`。
 - `WINDOW_HOURS`：固定投喂窗口长度，默认 6 小时。
 - `CATEGORY_LIMITS`：每名用户每个窗口所有类别合计的成功投喂次数，默认 3 次。虽然配置名沿用旧名称，但值现在是单个整数。
 - `CATEGORY_GAIN_RANGES`：LLM 返回的三类食物增重范围，单位为 kg。
@@ -59,6 +61,8 @@ FEED_BOT_FOOD__LLM_MODEL=
 - 昨日净体重变化（摄入和基础代谢结算后的实际变化）
 - 历史成功投喂总次数
 
+状态查询中的体重、今日累计增加体重和昨日净体重变化以斤展示，内部计算和数据存储仍使用 kg；换算比例为 `1kg=2斤`。
+
 私聊不会触发这些命令；`/查看体重` 和 `/查看状态` 是同一个命令的两个名称。
 
 ## 投喂规则
@@ -84,13 +88,13 @@ ceil(CATEGORY_LIMITS × 1.5)
 每日结算公式为：
 
 ```text
-a = M × (当前体重 / 初始体重)^4
+a = M × (当前体重 / 初始体重)^p
 d = 昨日实际摄入 - a
 体重变化 = 7.8541 × sign(d) × (1 - exp(-|d| / 20.7809))
 结算后体重 = 当前体重 + 体重变化
 ```
 
-其中 `M` 由 `METABOLIC_CONSTANT` 配置，默认 `5.00`；公式中的 `4`、`7.8541` 和 `20.7809` 是插件内置的模型参数，不作为配置项。摄入量超过代谢阈值后，体重增加会逐渐趋于饱和；摄入不足时则会减重。
+其中 `M` 由 `METABOLIC_CONSTANT` 配置，默认 `5.00`，`p` 由 `METABOLIC_POWER` 配置，默认 `2.00`；公式中的 `7.8541` 和 `20.7809` 是插件内置的模型参数，不作为配置项。摄入量超过代谢阈值后，体重增加会逐渐趋于饱和；摄入不足时则会减重。
 
 结算后体重不会低于 `0.00kg`。Bot 离线时，重新连接后会补做尚未结算的日期，且同一天只结算一次。
 

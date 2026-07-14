@@ -27,7 +27,6 @@ LOGGER = logging.getLogger(__name__)
 LLM_NOT_CONFIGURED_MESSAGE = "投喂功能暂时不可用，请先配置食物分类服务。"
 LLM_FAILED_MESSAGE = "投喂暂时失败，请稍后再试。"
 INTERNAL_ERROR_MESSAGE = "投喂暂时失败，请稍后再试。"
-METABOLIC_POWER = 4
 SATURATION_LIMIT = Decimal("7.8541")
 SATURATION_SCALE = Decimal("20.7809")
 MIN_WEIGHT = Decimal("0.00")
@@ -41,9 +40,10 @@ def _metabolic_threshold(
     current_weight: Decimal,
     standard_weight: Decimal,
     metabolic_constant: Decimal,
+    metabolic_power: Decimal,
 ) -> Decimal:
     ratio = current_weight / standard_weight
-    return metabolic_constant * (ratio**METABOLIC_POWER)
+    return metabolic_constant * (ratio**metabolic_power)
 
 
 def _nonlinear_weight_change(surplus: Decimal) -> Decimal:
@@ -297,6 +297,7 @@ class FeedService:
                 working_weight,
                 state.initial_weight,
                 self.config.metabolic_constant,
+                self.config.metabolic_power,
             )
             surplus = daily_gain - threshold
             weight_change = quantize_weight(_nonlinear_weight_change(surplus))
