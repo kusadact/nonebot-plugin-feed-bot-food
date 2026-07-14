@@ -16,7 +16,7 @@ class FeedBotFoodConfig(BaseModel):
 
     initial_weight: Decimal = Decimal("48.00")
     window_hours: int = 6
-    category_limits: tuple[int, int, int] = (1, 1, 1)
+    category_limits: int = 3
     category_gain_ranges: tuple[tuple[Decimal, Decimal], ...] = DEFAULT_GAIN_RANGES
     gain_range_fluctuation: Decimal = Decimal("0.15")
     decay_fluctuation: Decimal = Decimal("0.10")
@@ -41,10 +41,8 @@ class FeedBotFoodConfig(BaseModel):
 
     @field_validator("category_limits")
     @classmethod
-    def validate_category_limits(cls, value: tuple[int, int, int]) -> tuple[int, int, int]:
-        if any(item < 0 for item in value):
-            raise ValueError("category_limits cannot contain negative values")
-        if sum(value) <= 0:
+    def validate_category_limits(cls, value: int) -> int:
+        if value <= 0:
             raise ValueError("category_limits must allow at least one feed")
         return value
 

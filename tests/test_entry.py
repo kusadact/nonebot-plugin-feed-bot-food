@@ -49,8 +49,16 @@ def test_unknown_feed_has_a_user_facing_message() -> None:
     assert format_feed_result({"status": "ignored"}) == "无法确认这个食物的分类，未进行投喂。"
 
 
-def test_llm_error_is_silent() -> None:
-    assert format_feed_result({"status": "llm_error", "message": "上游失败"}) is None
+def test_llm_error_has_a_user_facing_message() -> None:
+    assert format_feed_result({"status": "llm_error", "message": "上游失败"}) == "上游失败"
+
+
+def test_llm_error_without_message_has_a_fallback_reply() -> None:
+    assert format_feed_result({"status": "llm_error"}) == "投喂暂时失败，请稍后再试。"
+
+
+def test_unknown_feed_result_still_has_a_user_facing_message() -> None:
+    assert format_feed_result({"status": "unexpected"}) == "投喂失败。"
 
 
 def test_empty_feed_has_a_user_facing_error() -> None:

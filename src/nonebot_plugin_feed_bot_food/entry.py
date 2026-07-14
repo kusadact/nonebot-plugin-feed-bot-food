@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from nonebot import on_command
+from nonebot import logger, on_command
 from nonebot.adapters import Event
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message
 from nonebot.matcher import Matcher
@@ -33,10 +33,15 @@ def register_matchers(service: FeedService) -> None:
         args: Message = CommandArg(),
     ) -> None:
         food = args.extract_plain_text().strip()
-        result = await service.feed(str(bot.self_id), str(event.user_id), food)
-        reply = format_feed_result(result)
-        if reply is not None:
-            await matcher.finish(reply)
+        try:
+            result = await service.feed(str(bot.self_id), str(event.user_id), food)
+        except Exception:
+            logger.exception("投喂命令处理失败")
+            result = {
+                "status": "internal_error",
+                "message": "投喂暂时失败，请稍后再试。",
+            }
+        await matcher.finish(format_feed_result(result))
 
     @status_matcher.handle()
     async def handle_status(bot: Bot, event: GroupMessageEvent, matcher: Matcher) -> None:
@@ -44,12 +49,12 @@ def register_matchers(service: FeedService) -> None:
         await matcher.finish(format_status_result(result))
 
 
-def format_feed_result(result: dict[str, Any]) -> str | None:
+def format_feed_result(result: dict[str, Any]) -> str:
     status = result.get("status")
     if status == "ignored":
         return str(result.get("message", "无法确认这个食物的分类，未进行投喂。"))
     if status == "llm_error":
-        return None
+        return str(result.get("message", "投喂暂时失败，请稍后再试。"))
     if status == "success":
         if result.get("too_much"):
             return (
@@ -64,8 +69,10 @@ def format_feed_result(result: dict[str, Any]) -> str | None:
         return f"{result['food']}不可食用。"
     if status == "invalid_food":
         return "请提供要投喂的食物。"
-    if status in {"request_limited", "category_limited"}:
+    if status in {"request_limited", "total_limited"}:
         return str(result.get("message", "投喂暂时不可用。"))
+    if status == "internal_error":
+        return str(result.get("message", "投喂暂时失败，请稍后再试。"))
     return str(result.get("message", "投喂失败。"))
 
 

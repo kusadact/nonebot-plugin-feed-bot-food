@@ -38,6 +38,11 @@ class FixedClassifier:
         return Classification(self.category, self.value, self.too_much)
 
 
+class BrokenClassifier:
+    async def classify(self, food: str) -> Classification:
+        raise RuntimeError("classifier crashed")
+
+
 class FixedRng:
     def __init__(self, value: float) -> None:
         self.value = value
@@ -57,13 +62,17 @@ def service_for(classifier: FixedClassifier, path: Path, **kwargs: object) -> Fe
 
 
 @pytest.mark.asyncio
-async def test_category_limit_and_hard_llm_limit() -> None:
+async def test_total_limit_and_hard_llm_limit() -> None:
     with TemporaryDirectory() as directory:
         classifier = FixedClassifier()
         service = service_for(classifier, Path(directory) / "state.json")
         assert (await service.feed("bot", "user", "饭", moment(8)))['status'] == "success"
-        for _ in range(4):
-            assert (await service.feed("bot", "user", "饭", moment(8)))['status'] == "category_limited"
+        classifier.category = FoodCategory.WATER
+        assert (await service.feed("bot", "user", "水", moment(8)))['status'] == "success"
+        classifier.category = FoodCategory.SNACK
+        assert (await service.feed("bot", "user", "蛋糕", moment(8)))['status'] == "success"
+        for _ in range(2):
+            assert (await service.feed("bot", "user", "饭", moment(8)))['status'] == "total_limited"
         result = await service.feed("bot", "user", "饭", moment(8))
 
     assert result["status"] == "request_limited"
@@ -71,58 +80,16 @@ async def test_category_limit_and_hard_llm_limit() -> None:
 
 
 @pytest.mark.asyncio
-async def test_boundary_slot_is_delayed_per_category() -> None:
-    with TemporaryDirectory() as directory:
-        path = Path(directory) / "state.json"
-        meal_classifier = FixedClassifier(FoodCategory.MEAL)
-        service = service_for(meal_classifier, path)
-        assert (await service.feed("bot", "user", "正餐", moment(11, 38)))['status'] == "success"
-        delayed = await service.feed("bot", "user", "正餐", moment(12, 5))
-        assert delayed["status"] == "category_limited"
-        assert delayed["retry_at"].startswith("2026-07-13T13:38")
-
-        water_classifier = FixedClassifier(FoodCategory.WATER, "0.10")
-        service.classifier = water_classifier
-        assert (await service.feed("bot", "user", "水", moment(12, 5)))['status'] == "success"
-
-        service.classifier = meal_classifier
-        assert (await service.feed("bot", "user", "正餐", moment(13, 38)))['status'] == "success"
-
-
-@pytest.mark.asyncio
-async def test_multiple_boundary_slots_recover_independently_without_new_delay() -> None:
+async def test_window_boundary_has_no_protection_delay() -> None:
     with TemporaryDirectory() as directory:
         path = Path(directory) / "state.json"
         classifier = FixedClassifier(FoodCategory.MEAL, "0.30")
-        service = service_for(classifier, path, category_limits=(2, 1, 1))
-
+        service = service_for(classifier, path)
         assert (await service.feed("bot", "user", "正餐", moment(11, 30)))['status'] == "success"
         assert (await service.feed("bot", "user", "正餐", moment(11, 50)))['status'] == "success"
-
-        first_recovered = await service.feed("bot", "user", "正餐", moment(13, 30))
-        assert first_recovered["status"] == "success"
-        assert (await service.feed("bot", "user", "正餐", moment(13, 40)))["status"] == "category_limited"
-        assert (await service.feed("bot", "user", "正餐", moment(13, 50)))['status'] == "success"
-
-        # 13:30/13:50 的新投喂不在 17:00-18:00 边界保护区，18:00 不应再次顺延。
-        assert (await service.feed("bot", "user", "正餐", moment(18, 0)))['status'] == "success"
-
-
-@pytest.mark.asyncio
-async def test_retry_uses_first_next_window_slot_release() -> None:
-    with TemporaryDirectory() as directory:
-        service = service_for(
-            FixedClassifier(FoodCategory.MEAL, "0.30"),
-            Path(directory) / "state.json",
-            category_limits=(2, 1, 1),
-        )
-        assert (await service.feed("bot", "user", "正餐", moment(16, 30)))['status'] == "success"
-        assert (await service.feed("bot", "user", "正餐", moment(17, 30)))['status'] == "success"
-
-        limited = await service.feed("bot", "user", "正餐", moment(17, 40))
-        assert limited["status"] == "category_limited"
-        assert limited["retry_at"].startswith("2026-07-13T18:00")
-        assert (await service.feed("bot", "user", "正餐", moment(18, 0)))['status'] == "success"
+        assert (await service.feed("bot", "user", "正餐", moment(12, 5)))['status'] == "success"
+        assert (await service.feed("bot", "user", "正餐", moment(12, 5)))['status'] == "success"
+        assert (await service.feed("bot", "user", "正餐", moment(12, 5)))['status'] == "success"
 
 
 @pytest.mark.asyncio
@@ -167,8 +134,27 @@ async def test_missing_llm_config_does_not_change_state() -> None:
         data = await JsonStateStore(path).load()
 
     assert result["status"] == "llm_error"
-    assert result["silent"] is True
+    assert result["reply_required"] is True
+    assert result["message"] == "投喂功能暂时不可用，请先配置食物分类服务。"
     assert data["bots"] == {}
+
+
+@pytest.mark.asyncio
+async def test_unexpected_feed_failure_returns_a_replyable_result() -> None:
+    with TemporaryDirectory() as directory:
+        service = FeedService(
+            FeedBotFoodConfig(),
+            JsonStateStore(Path(directory) / "state.json"),
+            BrokenClassifier(),
+        )
+        result = await service.feed("bot", "user", "饭", moment(8))
+
+    assert result == {
+        "status": "internal_error",
+        "food": "饭",
+        "message": "投喂暂时失败，请稍后再试。",
+        "reply_required": True,
+    }
 
 
 @pytest.mark.asyncio
@@ -184,6 +170,7 @@ async def test_non_edible_returns_message_without_changing_state() -> None:
         "status": "non_edible",
         "food": "猫薄荷",
         "message": "猫薄荷不可食用。",
+        "reply_required": True,
     }
     state = data["bots"]["bot"]
     assert state["current_weight"] == "48.00"
@@ -204,6 +191,7 @@ async def test_unknown_classification_returns_message_without_recording_feed() -
         "status": "ignored",
         "food": "未知物品",
         "message": "无法确认这个食物的分类，未进行投喂。",
+        "reply_required": True,
     }
     state = data["bots"]["bot"]
     assert state["current_weight"] == "48.00"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import random
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -9,10 +10,10 @@ from .classifier import ClassificationError, FoodClassifier
 from .config import FeedBotFoodConfig
 from .limits import (
     attempt_count,
-    category_available,
+    feed_available,
     hard_limit,
     localize,
-    next_category_retry,
+    next_feed_retry,
     now_local,
     prune_state,
     reserve_attempt,
@@ -22,6 +23,11 @@ from .limits import (
 )
 from .models import BotState, DailyStats, FeedEvent, FoodCategory, empty_state, quantize_weight
 from .storage import JsonStateStore
+
+LOGGER = logging.getLogger(__name__)
+LLM_NOT_CONFIGURED_MESSAGE = "投喂功能暂时不可用，请先配置食物分类服务。"
+LLM_FAILED_MESSAGE = "投喂暂时失败，请稍后再试。"
+INTERNAL_ERROR_MESSAGE = "投喂暂时失败，请稍后再试。"
 
 
 def _json_number(value: Decimal) -> float:
@@ -48,9 +54,39 @@ class FeedService:
         food: str,
         moment: datetime | None = None,
     ) -> dict[str, Any]:
+        """Feed the bot and always return a user-facing result contract.
+
+        The Agent tool is allowed to call this method outside the command
+        handler, so unexpected storage or integration failures must become a
+        structured result instead of escaping and leaving the user without a
+        reply.
+        """
+        raw_food = food.strip()
+        try:
+            return await self._feed(bot_id, user_id, raw_food, moment)
+        except Exception:
+            LOGGER.exception("处理投喂失败")
+            return {
+                "status": "internal_error",
+                "food": raw_food,
+                "message": INTERNAL_ERROR_MESSAGE,
+                "reply_required": True,
+            }
+
+    async def _feed(
+        self,
+        bot_id: str,
+        user_id: str,
+        food: str,
+        moment: datetime | None = None,
+    ) -> dict[str, Any]:
         food = food.strip()
         if not food:
-            return {"status": "invalid_food", "message": "请提供要投喂的食物。"}
+            return {
+                "status": "invalid_food",
+                "message": "请提供要投喂的食物。",
+                "reply_required": True,
+            }
         moment = localize(moment or now_local())
 
         classifier_config = getattr(self.classifier, "config", None)
@@ -58,22 +94,24 @@ class FeedService:
             return {
                 "status": "llm_error",
                 "food": food,
-                "message": "LLM 未配置，请先配置 Base URL、API Key 和 Model",
-                "silent": True,
+                "message": LLM_NOT_CONFIGURED_MESSAGE,
+                "reply_required": True,
             }
 
         reservation = await self._reserve_llm_attempt(bot_id, user_id, moment)
         if reservation is not None:
+            reservation["food"] = food
+            reservation["reply_required"] = True
             return reservation
 
         try:
             classification = await self.classifier.classify(food)
-        except ClassificationError as exc:
+        except ClassificationError:
             return {
                 "status": "llm_error",
-                "message": str(exc),
+                "message": LLM_FAILED_MESSAGE,
                 "food": food,
-                "silent": True,
+                "reply_required": True,
             }
 
         if classification.category == FoodCategory.UNKNOWN or classification.value is None:
@@ -81,12 +119,14 @@ class FeedService:
                 "status": "ignored",
                 "food": food,
                 "message": "无法确认这个食物的分类，未进行投喂。",
+                "reply_required": True,
             }
         if classification.category == FoodCategory.NON_EDIBLE:
             return {
                 "status": "non_edible",
                 "food": food,
                 "message": f"{food}不可食用。",
+                "reply_required": True,
             }
 
         async with self.store.lock:
@@ -94,17 +134,18 @@ class FeedService:
             state, created = self._get_state(root, bot_id, moment)
             settled = self._settle_state(state, moment)
             category = classification.category
-            if not category_available(state, user_id, category, moment, self.config):
-                retry_at = next_category_retry(state, user_id, category, moment, self.config)
+            if not feed_available(state, user_id, moment, self.config):
+                retry_at = next_feed_retry(moment, self.config)
                 if created or settled:
                     self._sync_state(root, bot_id, state)
                     await self.store.save(root)
                 return {
-                    "status": "category_limited",
+                    "status": "total_limited",
                     "food": food,
                     "category": category.value,
                     "retry_at": retry_at.isoformat(),
-                    "message": f"这一类食物投喂次数已用完，请在 {retry_at.strftime('%H:%M')} 后再投喂。",
+                    "message": f"本窗口投喂次数已用完，请在 {retry_at.strftime('%H:%M')} 后再投喂。",
+                    "reply_required": True,
                 }
 
             gain = quantize_weight(classification.value)
@@ -131,6 +172,7 @@ class FeedService:
                 "gain_kg": _json_number(gain),
                 "current_weight_kg": _json_number(state.current_weight),
                 "too_much": classification.too_much,
+                "reply_required": True,
             }
             return result
 

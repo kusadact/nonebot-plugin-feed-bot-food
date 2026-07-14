@@ -5,10 +5,8 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from .config import FeedBotFoodConfig
-from .models import BotState, FeedEvent, FoodCategory
+from .models import BotState, FeedEvent
 
-BOUNDARY_GUARD = timedelta(hours=1)
-SLOT_DELAY = timedelta(hours=2)
 SIX_AM = time(hour=6)
 APP_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
@@ -47,7 +45,7 @@ def window_key(moment: datetime, window_hours: int) -> str:
 
 
 def hard_limit(config: FeedBotFoodConfig) -> int:
-    return math.ceil(sum(config.category_limits) * 1.5)
+    return math.ceil(config.category_limits * 1.5)
 
 
 def attempt_count(state: BotState, user_id: str, current_window_key: str) -> int:
@@ -59,92 +57,38 @@ def reserve_attempt(state: BotState, user_id: str, current_window_key: str) -> N
     user_attempts[current_window_key] = user_attempts.get(current_window_key, 0) + 1
 
 
-def category_limit(config: FeedBotFoodConfig, category: FoodCategory) -> int:
-    return config.category_limits[(FoodCategory.MEAL, FoodCategory.WATER, FoodCategory.SNACK).index(category)]
-
-
 def _is_in_window(event: FeedEvent, start: datetime, end: datetime) -> bool:
     event_time = localize(event.timestamp)
     return start <= event_time < end
 
 
-def _carryover_events(
+def feed_count_in_window(
     state: BotState,
     user_id: str,
-    category: FoodCategory,
-    start: datetime,
-    now: datetime,
-) -> list[FeedEvent]:
-    guard_start = start - BOUNDARY_GUARD
-    return [
-        event
-        for event in state.events
-        if event.user_id == user_id
-        and event.category == category
-        and guard_start <= localize(event.timestamp) < start
-        and localize(event.timestamp) + SLOT_DELAY > now
-    ]
-
-
-def category_usage(
-    state: BotState,
-    user_id: str,
-    category: FoodCategory,
     moment: datetime,
     config: FeedBotFoodConfig,
-) -> tuple[int, int]:
+) -> int:
     moment = localize(moment)
     start = window_start(moment, config.window_hours)
     end = start + timedelta(hours=config.window_hours)
-    current = sum(
+    return sum(
         1
         for event in state.events
-        if event.user_id == user_id and event.category == category and _is_in_window(event, start, end)
+        if event.user_id == user_id and _is_in_window(event, start, end)
     )
-    carryover = len(_carryover_events(state, user_id, category, start, moment))
-    return current, carryover
 
 
-def category_available(
+def feed_available(
     state: BotState,
     user_id: str,
-    category: FoodCategory,
     moment: datetime,
     config: FeedBotFoodConfig,
 ) -> bool:
-    current, carryover = category_usage(state, user_id, category, moment, config)
-    return current + carryover < category_limit(config, category)
+    return feed_count_in_window(state, user_id, moment, config) < config.category_limits
 
 
-def next_category_retry(
-    state: BotState,
-    user_id: str,
-    category: FoodCategory,
-    moment: datetime,
-    config: FeedBotFoodConfig,
-) -> datetime:
-    moment = localize(moment)
-    start = window_start(moment, config.window_hours)
-    current_count, carryover_count = category_usage(state, user_id, category, moment, config)
-    limit = category_limit(config, category)
-    if current_count < limit and carryover_count:
-        active_carryovers = _carryover_events(state, user_id, category, start, moment)
-        if active_carryovers:
-            return min(localize(event.timestamp) + SLOT_DELAY for event in active_carryovers)
-    next_start = start + timedelta(hours=config.window_hours)
-    guard_start = next_start - BOUNDARY_GUARD
-    next_window_carryovers = []
-    for event in state.events:
-        event_time = localize(event.timestamp)
-        if (
-            event.user_id == user_id
-            and event.category == category
-            and guard_start <= event_time < next_start
-        ):
-            next_window_carryovers.append(event_time + SLOT_DELAY)
-    if len(next_window_carryovers) >= limit and next_window_carryovers:
-        return min(next_window_carryovers)
-    return next_start
+def next_feed_retry(moment: datetime, config: FeedBotFoodConfig) -> datetime:
+    return window_end(moment, config.window_hours)
 
 
 def prune_state(state: BotState, moment: datetime, window_hours: int) -> None:
