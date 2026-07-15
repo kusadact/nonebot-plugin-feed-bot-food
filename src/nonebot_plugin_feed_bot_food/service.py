@@ -36,6 +36,11 @@ def _json_number(value: Decimal) -> float:
     return float(quantize_weight(value))
 
 
+def _reported_weight(current_weight: Decimal, today_gain: Decimal) -> Decimal:
+    """Return body weight without adding today's intake a second time."""
+    return max(MIN_WEIGHT, quantize_weight(current_weight - today_gain))
+
+
 def _metabolic_threshold(
     current_weight: Decimal,
     standard_weight: Decimal,
@@ -189,7 +194,9 @@ class FeedService:
                 "food": food,
                 "category": category.value,
                 "gain_kg": _json_number(gain),
-                "current_weight_kg": _json_number(state.current_weight),
+                "current_weight_kg": _json_number(
+                    _reported_weight(state.current_weight, daily.gain)
+                ),
                 "too_much": classification.too_much,
                 "reply_required": True,
             }
@@ -211,7 +218,9 @@ class FeedService:
                 await self.store.save(root)
             return {
                 "status": "success",
-                "current_weight_kg": _json_number(state.current_weight),
+                "current_weight_kg": _json_number(
+                    _reported_weight(state.current_weight, daily.gain)
+                ),
                 "today_feed_count": daily.feed_count,
                 "today_gain_kg": _json_number(daily.gain),
                 "yesterday_feed_count": yesterday.feed_count,
