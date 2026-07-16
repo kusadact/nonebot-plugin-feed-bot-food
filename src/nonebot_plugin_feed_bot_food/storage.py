@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 LEGACY_SCHEMA_VERSION = 1
 
 
@@ -55,8 +55,13 @@ class JsonStateStore:
         migrated = False
         if version == LEGACY_SCHEMA_VERSION:
             data = _migrate_v1_to_v2(data)
+            version = 2
             migrated = True
-        elif version != SCHEMA_VERSION:
+        if version == 2:
+            data = _migrate_v2_to_v3(data)
+            version = 3
+            migrated = True
+        if version != SCHEMA_VERSION:
             raise StateStorageError(f"不支持的 JSON 状态版本: {version}")
         data.setdefault("schema_version", SCHEMA_VERSION)
         if migrated:
@@ -107,5 +112,22 @@ def _migrate_v1_to_v2(data: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(raw_daily, dict):
                 raise StateStorageError("JSON 状态中的每日统计项格式无效")
             raw_daily.setdefault("weight_change", "0.00")
-    data["schema_version"] = SCHEMA_VERSION
+    data["schema_version"] = 2
+    return data
+
+
+def _migrate_v2_to_v3(data: dict[str, Any]) -> dict[str, Any]:
+    bots = data.get("bots", {})
+    for raw_state in bots.values():
+        if not isinstance(raw_state, dict):
+            raise StateStorageError("JSON 状态中的 Bot 数据格式无效")
+        raw_state.pop("user_attempts", None)
+        events = raw_state.get("events", [])
+        if not isinstance(events, list):
+            raise StateStorageError("JSON 状态中的投喂事件格式无效")
+        for raw_event in events:
+            if not isinstance(raw_event, dict):
+                raise StateStorageError("JSON 状态中的投喂事件格式无效")
+            raw_event.pop("category", None)
+    data["schema_version"] = 3
     return data

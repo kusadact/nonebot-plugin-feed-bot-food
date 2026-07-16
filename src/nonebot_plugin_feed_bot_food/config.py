@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, SecretStr, field_validator
+from pydantic import BaseModel, Field, field_validator
 
-DEFAULT_GAIN_RANGES: tuple[tuple[Decimal, Decimal], ...] = (
-    (Decimal("0.30"), Decimal("1.00")),
-    (Decimal("0.05"), Decimal("0.30")),
-    (Decimal("0.10"), Decimal("0.50")),
+DEFAULT_RANDOM_GAIN_RANGE: tuple[Decimal, Decimal] = (
+    Decimal("0.05"),
+    Decimal("1.00"),
 )
 
 
@@ -19,12 +18,8 @@ class FeedBotFoodConfig(BaseModel):
     metabolic_power: Decimal = Decimal("2.00")
     window_hours: int = 6
     category_limits: int = 3
-    category_gain_ranges: tuple[tuple[Decimal, Decimal], ...] = DEFAULT_GAIN_RANGES
-    gain_range_fluctuation: Decimal = Decimal("0.15")
+    random_gain_range: tuple[Decimal, Decimal] = DEFAULT_RANDOM_GAIN_RANGE
     enable_groupmate_agent: bool = True
-    llm_base_url: str = ""
-    llm_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""))
-    llm_model: str = ""
 
     @field_validator("initial_weight")
     @classmethod
@@ -61,33 +56,18 @@ class FeedBotFoodConfig(BaseModel):
             raise ValueError("category_limits must allow at least one feed")
         return value
 
-    @field_validator("category_gain_ranges")
+    @field_validator("random_gain_range")
     @classmethod
-    def validate_gain_ranges(
+    def validate_random_gain_range(
         cls,
-        value: tuple[tuple[Decimal, Decimal], ...],
-    ) -> tuple[tuple[Decimal, Decimal], ...]:
-        if len(value) != 3:
-            raise ValueError("category_gain_ranges must contain meal, water and snack ranges")
-        for lower, upper in value:
-            if lower < 0 or upper <= lower:
-                raise ValueError("each gain range must satisfy 0 <= lower < upper")
+        value: tuple[Decimal, Decimal],
+    ) -> tuple[Decimal, Decimal]:
+        if len(value) != 2:
+            raise ValueError("random_gain_range must contain a lower and upper bound")
+        lower, upper = value
+        if not lower.is_finite() or not upper.is_finite() or lower < 0 or upper <= lower:
+            raise ValueError("random_gain_range must satisfy 0 <= lower < upper")
         return value
-
-    @field_validator("gain_range_fluctuation")
-    @classmethod
-    def validate_gain_range_fluctuation(cls, value: Decimal) -> Decimal:
-        if value < 0:
-            raise ValueError("gain_range_fluctuation cannot be negative")
-        return value
-
-    @property
-    def llm_api_key_value(self) -> str:
-        return self.llm_api_key.get_secret_value().strip()
-
-    @property
-    def llm_ready(self) -> bool:
-        return bool(self.llm_base_url.strip() and self.llm_api_key_value and self.llm_model.strip())
 
 
 class Config(BaseModel):

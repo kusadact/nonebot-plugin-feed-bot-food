@@ -2,6 +2,16 @@
 
 本文件只记录插件本身的功能更新与 bugfix。
 
+## [0.1.10] - 2026-07-16
+
+### Changed
+
+- 移除内置 LLM 食物分类，改为使用 Python 随机数生成投喂增重。
+- 新增 `FEED_BOT_FOOD__RANDOM_GAIN_RANGE`，默认随机增重范围为 `0.05～1.00kg`。
+- 更新 Agent Tool prompt，由 Agent 判断是否应该调用投喂工具；直接 `/投喂` 命令对非空内容直接执行投喂。
+- 移除分类增重范围、范围浮动和 LLM 连接配置。
+- 状态文件升级为 schema v3，自动迁移旧 JSON 并移除历史分类字段和 LLM 请求计数。
+
 ## [Unreleased]
 
 ### Changed

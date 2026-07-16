@@ -22,12 +22,8 @@ FEED_BOT_FOOD__METABOLIC_CONSTANT=5.00
 FEED_BOT_FOOD__METABOLIC_POWER=2.00
 FEED_BOT_FOOD__WINDOW_HOURS=6
 FEED_BOT_FOOD__CATEGORY_LIMITS=3
-FEED_BOT_FOOD__CATEGORY_GAIN_RANGES=[[0.30, 1.00], [0.05, 0.30], [0.10, 0.50]]
-FEED_BOT_FOOD__GAIN_RANGE_FLUCTUATION=0.15
+FEED_BOT_FOOD__RANDOM_GAIN_RANGE=[0.05, 1.00]
 FEED_BOT_FOOD__ENABLE_GROUPMATE_AGENT=true
-FEED_BOT_FOOD__LLM_BASE_URL=https://api.openai.com/v1
-FEED_BOT_FOOD__LLM_API_KEY=
-FEED_BOT_FOOD__LLM_MODEL=
 ```
 
 - `INITIAL_WEIGHT`：首次创建某个 Bot 状态时的初始体重，默认 `48.00kg`。
@@ -35,10 +31,8 @@ FEED_BOT_FOOD__LLM_MODEL=
 - `METABOLIC_POWER`：基础代谢阈值中的非线性指数 `p`，默认 `2.00`。
 - `WINDOW_HOURS`：固定投喂窗口长度，默认 6 小时。
 - `CATEGORY_LIMITS`：每名用户每个窗口所有类别合计的成功投喂次数，默认 3 次。虽然配置名沿用旧名称，但值现在是单个整数。
-- `CATEGORY_GAIN_RANGES`：LLM 返回的三类食物增重范围，单位为 kg。
-- `GAIN_RANGE_FLUCTUATION`：每次分类时对三类增重范围上下限分别施加的随机浮动，默认 `0.15kg`。
+- `RANDOM_GAIN_RANGE`：每次成功投喂随机增加的体重范围，默认 `0.05～1.00kg`。
 - `ENABLE_GROUPMATE_AGENT`：是否注册 Agent Tool，默认开启；groupmate-agent 不可用时自动跳过。
-- `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`：OpenAI 兼容的食物分类接口。缺少任一项时插件仍能加载，但投喂不会修改体重，并会返回配置提示。
 
 最低体重固定为 `0.00kg`，每天 Asia/Shanghai 时间 `06:00` 结算昨日体重，不作为配置项。
 
@@ -69,23 +63,13 @@ FEED_BOT_FOOD__LLM_MODEL=
 
 ## 投喂规则
 
-食物交给 OpenAI 兼容 LLM 判断为正餐、水、甜品/小食或不可食用，并要求返回 JSON 分类和增重值。插件会校验并限制增重值在对应配置范围内。
-
-LLM 还会识别输入中的数量和重量。超过对应类别的单次上限时，返回 `too_much=true` 并把本次增重限制在最大值；Agent 会根据实际增重值自行组织回复。
+Agent 会在调用投喂工具前，根据用户意图判断输入是否像食物或饮料；闲聊、提问、举例或无法判断时不会调用工具。工具被调用后，插件使用 Python 随机数在 `RANDOM_GAIN_RANGE` 内生成本次增加的体重。直接 `/投喂` 命令不进行食物分类，非空输入即可进入投喂流程。
 
 “今日”统计区间为 Asia/Shanghai 时间 `06:00` 至次日 `05:59:59`。固定窗口默认是 `06-12`、`12-18`、`18-00`、`00-06`。
 
 每个用户每个窗口按所有类别合计限制成功投喂次数。窗口到达边界后立即刷新额度，不再设置边界保护区或顺延分类槽位。
 
-每名用户每窗口发送给 LLM 的请求数上限为：
-
-```text
-ceil(CATEGORY_LIMITS × 1.5)
-```
-
-例如 `CATEGORY_LIMITS=3` 时，每个窗口最多向 LLM 发起 5 次请求。成功、不可食用、无法分类以及 LLM 请求失败都会计入这个请求上限；达到上限后不会再请求 LLM。
-
-只要投喂请求已经进入插件，成功、不可食用、无法分类、限流、配置错误和服务失败都会返回一条用户可见提示，不会静默结束。
+只要投喂请求已经进入插件，成功、限流、参数错误和服务失败都会返回一条用户可见提示，不会静默结束。
 
 每日结算公式为：
 
@@ -104,16 +88,16 @@ d = 昨日实际摄入 - a
 
 插件通过 groupmate-agent 的注册接口提供两个 Tool：
 
-- `feed_bot_food(food)`：执行投喂并返回分类、增重和当前体重。
+- `feed_bot_food(food)`：执行投喂并返回增加的体重和当前体重。
 - `get_feed_bot_status()`：返回当前体重、今日和昨日投喂统计及历史总次数。
 
-Tool 只返回结构化 JSON，不直接发送 OneBot 消息；只要 `feed_bot_food` 已被调用，Agent 必须依据结果调用 `reply_user` 回复，不能调用 `finish` 后静默。Agent Tool 只在群聊上下文提供，groupmate-agent 未安装、未加载或集成关闭时，直接群聊命令仍可用。若 Agent 宿主在工具调用前就判定普通消息无需参与，则不会发生投喂，也不属于插件已处理的投喂请求。
+Tool 只返回结构化 JSON，不直接发送 OneBot 消息；只有用户明确想投喂且输入看起来像食物或饮料时，Agent 才应调用 `feed_bot_food`。只要 `feed_bot_food` 已被调用，Agent 必须依据结果调用 `reply_user` 回复，不能调用 `finish` 后静默。Agent Tool 只在群聊上下文提供，groupmate-agent 未安装、未加载或集成关闭时，直接群聊命令仍可用。
 
 ## 数据文件
 
 状态保存在 NoneBot 插件标准数据目录的 `state.json` 中。数据按 Bot ID 分区，使用原子写入和进程内锁保护并发更新。
 
-当前状态文件格式为 schema v2。首次读取 schema v1 文件时，插件会补齐每日体重变化字段并立即原子写回 v2；后续版本将移除对 schema v1 的兼容。
+当前状态文件格式为 schema v3。首次读取 schema v1 或 v2 文件时，插件会自动补齐每日体重变化字段，并移除旧 LLM 投喂事件中的 `category` 和 `user_attempts` 字段，然后原子写回 v3。
 
 ## 开发
 

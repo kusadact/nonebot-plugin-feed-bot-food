@@ -64,25 +64,14 @@ def register_matchers(service: FeedService) -> None:
 
 def format_feed_result(result: dict[str, Any]) -> str:
     status = result.get("status")
-    if status == "ignored":
-        return str(result.get("message", "无法确认这个食物的分类，未进行投喂。"))
-    if status == "llm_error":
-        return str(result.get("message", "投喂暂时失败，请稍后再试。"))
     if status == "success":
-        if result.get("too_much"):
-            return (
-                f"本次实际吃了 {float(result['gain_kg']):.2f}kg，"
-                f"当前体重 {float(result['current_weight_kg']):.2f}kg。"
-            )
         return (
             f"投喂{result['food']}成功，增加 {float(result['gain_kg']):.2f}kg，"
             f"当前体重 {float(result['current_weight_kg']):.2f}kg。"
         )
-    if status == "non_edible":
-        return f"{result['food']}不可食用。"
     if status == "invalid_food":
         return "请提供要投喂的食物。"
-    if status in {"request_limited", "total_limited"}:
+    if status == "total_limited":
         return str(result.get("message", "投喂暂时不可用。"))
     if status == "internal_error":
         return str(result.get("message", "投喂暂时失败，请稍后再试。"))

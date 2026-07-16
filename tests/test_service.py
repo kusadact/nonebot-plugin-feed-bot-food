@@ -9,88 +9,75 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from nonebot_plugin_feed_bot_food.classifier import Classification, FoodClassifier
 from nonebot_plugin_feed_bot_food.config import FeedBotFoodConfig
-from nonebot_plugin_feed_bot_food.models import FoodCategory
 from nonebot_plugin_feed_bot_food.service import FeedService
 from nonebot_plugin_feed_bot_food.storage import JsonStateStore
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
-def test_metabolic_power_defaults_to_two() -> None:
-    assert FeedBotFoodConfig().metabolic_power == Decimal("2.00")
-
-
 def moment(hour: int, minute: int = 0, day: int = 13) -> datetime:
     return datetime(2026, 7, day, hour, minute, tzinfo=SHANGHAI)
 
 
-class FixedClassifier:
-    def __init__(
-        self,
-        category: FoodCategory = FoodCategory.MEAL,
-        value: str = "0.62",
-        too_much: bool = False,
-    ) -> None:
-        self.category = category
+class FixedGainGenerator:
+    def __init__(self, value: str = "0.62") -> None:
         self.value = Decimal(value)
-        self.too_much = too_much
         self.calls = 0
 
-    async def classify(self, food: str) -> Classification:
+    def generate(self) -> Decimal:
         self.calls += 1
-        return Classification(self.category, self.value, self.too_much)
+        return self.value
 
 
-class BrokenClassifier:
-    async def classify(self, food: str) -> Classification:
-        raise RuntimeError("classifier crashed")
+class BrokenGainGenerator:
+    def generate(self) -> Decimal:
+        raise RuntimeError("gain generator crashed")
 
 
-def service_for(classifier: FixedClassifier, path: Path, **kwargs: object) -> FeedService:
+def service_for(gain_generator: object, path: Path, **kwargs: object) -> FeedService:
     return FeedService(
         FeedBotFoodConfig(**kwargs),
         JsonStateStore(path),
-        classifier,
+        gain_generator,  # type: ignore[arg-type]
     )
 
 
-@pytest.mark.asyncio
-async def test_total_limit_and_hard_llm_limit() -> None:
-    with TemporaryDirectory() as directory:
-        classifier = FixedClassifier()
-        service = service_for(classifier, Path(directory) / "state.json")
-        assert (await service.feed("bot", "user", "饭", moment(8)))['status'] == "success"
-        classifier.category = FoodCategory.WATER
-        assert (await service.feed("bot", "user", "水", moment(8)))['status'] == "success"
-        classifier.category = FoodCategory.SNACK
-        assert (await service.feed("bot", "user", "蛋糕", moment(8)))['status'] == "success"
-        for _ in range(2):
-            assert (await service.feed("bot", "user", "饭", moment(8)))['status'] == "total_limited"
-        result = await service.feed("bot", "user", "饭", moment(8))
+def test_metabolic_power_defaults_to_two() -> None:
+    assert FeedBotFoodConfig().metabolic_power == Decimal("2.00")
 
-    assert result["status"] == "request_limited"
-    assert classifier.calls == 5
+
+@pytest.mark.asyncio
+async def test_total_limit_is_the_only_feed_limit() -> None:
+    with TemporaryDirectory() as directory:
+        generator = FixedGainGenerator()
+        service = service_for(generator, Path(directory) / "state.json")
+        assert (await service.feed("bot", "user", "饭", moment(8)))['status'] == "success"
+        assert (await service.feed("bot", "user", "水", moment(8)))['status'] == "success"
+        assert (await service.feed("bot", "user", "石头", moment(8)))['status'] == "success"
+        result = await service.feed("bot", "user", "蛋糕", moment(8))
+
+    assert result["status"] == "total_limited"
+    assert generator.calls == 3
 
 
 @pytest.mark.asyncio
 async def test_window_boundary_has_no_protection_delay() -> None:
     with TemporaryDirectory() as directory:
         path = Path(directory) / "state.json"
-        classifier = FixedClassifier(FoodCategory.MEAL, "0.30")
-        service = service_for(classifier, path)
-        assert (await service.feed("bot", "user", "正餐", moment(11, 30)))['status'] == "success"
-        assert (await service.feed("bot", "user", "正餐", moment(11, 50)))['status'] == "success"
-        assert (await service.feed("bot", "user", "正餐", moment(12, 5)))['status'] == "success"
-        assert (await service.feed("bot", "user", "正餐", moment(12, 5)))['status'] == "success"
-        assert (await service.feed("bot", "user", "正餐", moment(12, 5)))['status'] == "success"
+        generator = FixedGainGenerator("0.30")
+        service = service_for(generator, path)
+        assert (await service.feed("bot", "user", "食物", moment(11, 30)))['status'] == "success"
+        assert (await service.feed("bot", "user", "食物", moment(11, 50)))['status'] == "success"
+        assert (await service.feed("bot", "user", "食物", moment(12, 5)))['status'] == "success"
+        assert (await service.feed("bot", "user", "食物", moment(12, 5)))['status'] == "success"
+        assert (await service.feed("bot", "user", "食物", moment(12, 5)))['status'] == "success"
 
 
 @pytest.mark.asyncio
 async def test_status_contains_today_yesterday_and_total_fields() -> None:
     with TemporaryDirectory() as directory:
-        service = service_for(FixedClassifier(), Path(directory) / "state.json")
+        service = service_for(FixedGainGenerator(), Path(directory) / "state.json")
         await service.feed("bot", "user", "饭", moment(8))
         result = await service.get_status("bot", moment(8))
 
@@ -110,17 +97,18 @@ async def test_status_contains_today_yesterday_and_total_fields() -> None:
 @pytest.mark.asyncio
 async def test_feed_result_reports_weight_without_today_gain() -> None:
     with TemporaryDirectory() as directory:
-        service = service_for(FixedClassifier(value="0.62"), Path(directory) / "state.json")
+        service = service_for(FixedGainGenerator("0.62"), Path(directory) / "state.json")
         result = await service.feed("bot", "user", "饭", moment(8))
 
     assert result["current_weight_kg"] == 48.00
     assert result["gain_kg"] == 0.62
+    assert "category" not in result
 
 
 @pytest.mark.asyncio
 async def test_status_reports_historical_cumulative_gain() -> None:
     with TemporaryDirectory() as directory:
-        service = service_for(FixedClassifier(value="0.62"), Path(directory) / "state.json")
+        service = service_for(FixedGainGenerator("0.62"), Path(directory) / "state.json")
         await service.feed("bot", "user", "饭", moment(8, day=12))
         await service.feed("bot", "user", "饭", moment(8, day=13))
         result = await service.get_status("bot", moment(8, day=13))
@@ -132,7 +120,7 @@ async def test_status_reports_historical_cumulative_gain() -> None:
 async def test_daily_metabolism_uses_yesterday_intake_and_keeps_two_decimals() -> None:
     with TemporaryDirectory() as directory:
         service = service_for(
-            FixedClassifier(value="0.50"),
+            FixedGainGenerator("0.50"),
             Path(directory) / "state.json",
         )
         await service.feed("bot", "user", "饭", moment(12, day=12))
@@ -151,7 +139,7 @@ async def test_daily_metabolism_uses_yesterday_intake_and_keeps_two_decimals() -
 async def test_standard_weight_is_stable_when_intake_matches_metabolism() -> None:
     with TemporaryDirectory() as directory:
         service = service_for(
-            FixedClassifier(value="5.00"),
+            FixedGainGenerator("5.00"),
             Path(directory) / "state.json",
         )
         await service.feed("bot", "user", "饭", moment(12, day=12))
@@ -165,7 +153,7 @@ async def test_standard_weight_is_stable_when_intake_matches_metabolism() -> Non
 async def test_large_intake_uses_nonlinear_weight_change() -> None:
     with TemporaryDirectory() as directory:
         service = service_for(
-            FixedClassifier(value="15.00"),
+            FixedGainGenerator("15.00"),
             Path(directory) / "state.json",
         )
         await service.feed("bot", "user", "饭", moment(12, day=12))
@@ -176,7 +164,7 @@ async def test_large_intake_uses_nonlinear_weight_change() -> None:
 
 
 @pytest.mark.asyncio
-async def test_legacy_state_is_migrated_and_written_as_schema_v2() -> None:
+async def test_legacy_state_is_migrated_and_written_as_schema_v3() -> None:
     with TemporaryDirectory() as directory:
         path = Path(directory) / "state.json"
         path.write_text(
@@ -189,7 +177,15 @@ async def test_legacy_state_is_migrated_and_written_as_schema_v2() -> None:
                             "current_weight": "48.50",
                             "total_feed_count": 1,
                             "daily": {"2026-07-12": {"feed_count": 1, "gain": "0.50"}},
-                            "events": [],
+                            "events": [
+                                {
+                                    "user_id": "user",
+                                    "category": "meal",
+                                    "food": "饭",
+                                    "gain": "0.50",
+                                    "timestamp": "2026-07-12T08:00:00+08:00",
+                                }
+                            ],
                             "user_attempts": {},
                             "last_settled_date": "2026-07-12",
                         }
@@ -202,24 +198,65 @@ async def test_legacy_state_is_migrated_and_written_as_schema_v2() -> None:
         data = await JsonStateStore(path).load()
         written = json.loads(path.read_text(encoding="utf-8"))
 
-    assert data["schema_version"] == 2
+    assert data["schema_version"] == 3
     assert data["bots"]["bot"]["daily"]["2026-07-12"]["weight_change"] == "0.00"
+    assert "category" not in data["bots"]["bot"]["events"][0]
+    assert "user_attempts" not in data["bots"]["bot"]
     assert written == data
 
 
 @pytest.mark.asyncio
-async def test_missing_llm_config_does_not_change_state() -> None:
+async def test_schema_v2_state_is_migrated_to_schema_v3() -> None:
+    with TemporaryDirectory() as directory:
+        path = Path(directory) / "state.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "bots": {
+                        "bot": {
+                            "initial_weight": "48.00",
+                            "current_weight": "48.50",
+                            "total_feed_count": 1,
+                            "daily": {},
+                            "events": [
+                                {
+                                    "user_id": "user",
+                                    "category": "meal",
+                                    "food": "饭",
+                                    "gain": "0.50",
+                                    "timestamp": "2026-07-12T08:00:00+08:00",
+                                }
+                            ],
+                            "user_attempts": {"user": {"2026-07-12T06:00:00+08:00": 1}},
+                            "last_settled_date": "2026-07-12",
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        data = await JsonStateStore(path).load()
+
+    assert data["schema_version"] == 3
+    assert "category" not in data["bots"]["bot"]["events"][0]
+    assert "user_attempts" not in data["bots"]["bot"]
+
+
+@pytest.mark.asyncio
+async def test_non_empty_feed_does_not_require_llm() -> None:
     with TemporaryDirectory() as directory:
         path = Path(directory) / "state.json"
         config = FeedBotFoodConfig()
-        service = FeedService(config, JsonStateStore(path), FoodClassifier(config))
-        result = await service.feed("bot", "user", "饭", moment(8))
-        data = await JsonStateStore(path).load()
+        service = FeedService(
+            config,
+            JsonStateStore(path),
+            FixedGainGenerator(),  # type: ignore[arg-type]
+        )
+        result = await service.feed("bot", "user", "石头", moment(8))
 
-    assert result["status"] == "llm_error"
-    assert result["reply_required"] is True
-    assert result["message"] == "投喂功能暂时不可用，请先配置食物分类服务。"
-    assert data["bots"] == {}
+    assert result["status"] == "success"
 
 
 @pytest.mark.asyncio
@@ -228,7 +265,7 @@ async def test_unexpected_feed_failure_returns_a_replyable_result() -> None:
         service = FeedService(
             FeedBotFoodConfig(),
             JsonStateStore(Path(directory) / "state.json"),
-            BrokenClassifier(),
+            BrokenGainGenerator(),  # type: ignore[arg-type]
         )
         result = await service.feed("bot", "user", "饭", moment(8))
 
@@ -241,57 +278,46 @@ async def test_unexpected_feed_failure_returns_a_replyable_result() -> None:
 
 
 @pytest.mark.asyncio
-async def test_non_edible_returns_message_without_changing_state() -> None:
+async def test_empty_feed_does_not_change_state() -> None:
     with TemporaryDirectory() as directory:
         path = Path(directory) / "state.json"
-        classifier = FixedClassifier(FoodCategory.NON_EDIBLE)
-        service = service_for(classifier, path)
-        result = await service.feed("bot", "user", "猫薄荷", moment(8))
+        service = service_for(FixedGainGenerator(), path)
+        result = await service.feed("bot", "user", "  ", moment(8))
         data = await JsonStateStore(path).load()
 
     assert result == {
-        "status": "non_edible",
-        "food": "猫薄荷",
-        "message": "猫薄荷不可食用。",
+        "status": "invalid_food",
+        "message": "请提供要投喂的食物。",
         "reply_required": True,
     }
-    state = data["bots"]["bot"]
-    assert state["current_weight"] == "48.00"
-    assert state["total_feed_count"] == 0
-    assert state["events"] == []
+    assert data["bots"] == {}
 
 
 @pytest.mark.asyncio
-async def test_unknown_classification_returns_message_without_recording_feed() -> None:
+async def test_old_category_state_can_be_read() -> None:
     with TemporaryDirectory() as directory:
         path = Path(directory) / "state.json"
-        classifier = FixedClassifier(FoodCategory.UNKNOWN)
-        service = service_for(classifier, path)
-        result = await service.feed("bot", "user", "未知物品", moment(8))
-        data = await JsonStateStore(path).load()
+        service = service_for(FixedGainGenerator(), path)
+        root = await JsonStateStore(path).load()
+        root["bots"]["bot"] = {
+            "initial_weight": "48.00",
+            "current_weight": "48.50",
+            "total_feed_count": 1,
+            "daily": {"2026-07-12": {"feed_count": 1, "gain": "0.50", "weight_change": "0.00"}},
+            "events": [
+                {
+                    "user_id": "user",
+                    "category": "meal",
+                    "food": "饭",
+                    "gain": "0.50",
+                    "timestamp": "2026-07-12T08:00:00+08:00",
+                }
+            ],
+            "user_attempts": {},
+            "last_settled_date": "2026-07-12",
+        }
+        await JsonStateStore(path).save(root)
 
-    assert result == {
-        "status": "ignored",
-        "food": "未知物品",
-        "message": "无法确认这个食物的分类，未进行投喂。",
-        "reply_required": True,
-    }
-    state = data["bots"]["bot"]
-    assert state["current_weight"] == "48.00"
-    assert state["total_feed_count"] == 0
-    assert state["events"] == []
+        result = await service.get_status("bot", moment(8, day=13))
 
-
-@pytest.mark.asyncio
-async def test_over_limit_feed_is_capped_without_fixed_message() -> None:
-    with TemporaryDirectory() as directory:
-        service = service_for(
-            FixedClassifier(value="0.62", too_much=True),
-            Path(directory) / "state.json",
-        )
-        result = await service.feed("bot", "user", "16包方便面", moment(8))
-
-    assert result["status"] == "success"
-    assert result["too_much"] is True
-    assert result["gain_kg"] == 0.62
-    assert "message" not in result
+    assert result["total_feed_count"] == 1

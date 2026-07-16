@@ -8,14 +8,14 @@ from nonebot import get_plugin_config, logger, require
 from nonebot.plugin import PluginMetadata
 
 from .agent_tools import register_agent_tools
-from .classifier import FoodClassifier
 from .config import Config
 from .entry import register_matchers
+from .gain import RandomGainGenerator
 from .scheduler import register_scheduler
 from .service import FeedService
 from .storage import JsonStateStore
 
-__version__ = "0.1.9"
+__version__ = "0.1.10"
 
 __plugin_meta__ = PluginMetadata(
     name="nonebot-plugin-feed-bot-food",
@@ -29,8 +29,8 @@ __plugin_meta__ = PluginMetadata(
 
 plugin_config = get_plugin_config(Config).feed_bot_food
 state_store = JsonStateStore()
-classifier = FoodClassifier(plugin_config)
-feed_service = FeedService(plugin_config, state_store, classifier)
+gain_generator = RandomGainGenerator(plugin_config)
+feed_service = FeedService(plugin_config, state_store, gain_generator)
 
 register_matchers(feed_service)
 register_scheduler(feed_service)

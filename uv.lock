@@ -328,10 +328,9 @@ wheels = [
 
 [[package]]
 name = "nonebot-plugin-feed-bot-food"
-version = "0.1.9"
+version = "0.1.10"
 source = { editable = "." }
 dependencies = [
-    { name = "httpx" },
     { name = "nonebot-adapter-onebot" },
     { name = "nonebot-plugin-apscheduler" },
     { name = "nonebot-plugin-localstore" },
@@ -341,6 +340,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -348,7 +348,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "httpx", specifier = ">=0.28.1" },
     { name = "nonebot-adapter-onebot", specifier = ">=2.4.6,<3.0.0" },
     { name = "nonebot-plugin-apscheduler", specifier = ">=0.5.0" },
     { name = "nonebot-plugin-localstore", specifier = ">=0.7.4" },
@@ -358,6 +357,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
     { name = "ruff", specifier = ">=0.8.0,<1.0.0" },
