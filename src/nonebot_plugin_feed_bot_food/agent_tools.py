@@ -1,20 +1,28 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from .service import FeedService
 
 FEED_BOT_FOOD_INSTRUCTIONS = (
-    "- 只有当用户明确表达投喂意图，并且输入看起来是食物或饮料时，才调用 feed_bot_food。",
-    "- 如果用户只是闲聊、提问、举例，或无法判断输入是否为食物，不要调用 feed_bot_food。",
-    "- 一旦调用了 feed_bot_food，就视为已经处理了用户投喂；无论返回 success、total_limited、invalid_food 还是 internal_error，都必须继续调用 reply_user 回复用户，不能调用 finish 后静默。",
-    "- feed_bot_food 不负责判断食物是否可食用；是否调用工具由 Agent 根据上下文判断。",
-    "- feed_bot_food 返回 success 时依据 gain_kg 和 current_weight_kg 回复用户，措辞由 Agent 自然组织。",
-    "- feed_bot_food 返回 total_limited 或 invalid_food 时，依据返回的 message 回复；不要重复调用工具。",
-    "- feed_bot_food 返回 internal_error 时，必须依据 message 告知用户本次投喂未完成；不要静默结束本次处理。",
-    "- 工具只处理体重和投喂数据，最终回复由 Agent 根据自身规则生成。",
+    "- 只有当用户明确想让 Bot 吃东西，并且输入看起来是可以吃的食物或可以喝的饮料时，才调用 feed_bot_food。",
+    "- 如果输入明显不能吃或不能喝，例如石头、手机等，直接拒绝，不要调用 feed_bot_food。",
+    "- 如果只是闲聊、提问、举例，或无法判断能不能吃，不要调用 feed_bot_food。",
+    "- 只要调用了工具，就必须调用 reply_user 回复用户，不能静默结束。",
+    "- 投喂成功后，用 today_gain_kg 告诉用户今天一共吃了多少；不要提当前体重，体重会在第二天 06:00 结算。",
     "- 用户询问当前体重或投喂统计时调用 get_feed_bot_status。",
+    "- 其他工具结果直接根据 message 回复，不要重复调用工具。",
 )
+
+
+def _agent_feed_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Keep the feed tool focused on today's intake instead of unsettled weight."""
+    if result.get("status") != "success":
+        return result
+    result = dict(result)
+    result.pop("current_weight_kg", None)
+    return result
 
 
 def register_agent_tools(service: FeedService) -> bool:
@@ -36,7 +44,7 @@ def register_agent_tools(service: FeedService) -> bool:
 
         @tool("feed_bot_food")
         async def feed_bot_food(food: str) -> str:
-            """投喂一种食物，并返回增加体重和当前体重。"""
+            """投喂一种食物，并返回今天累计吃了多少。"""
             try:
                 result = await service.feed(ctx.bot_id or "", ctx.user_id or "", food)
             except Exception:
@@ -46,7 +54,7 @@ def register_agent_tools(service: FeedService) -> bool:
                     "message": "投喂暂时失败，请稍后再试。",
                     "reply_required": True,
                 }
-            return json.dumps(result, ensure_ascii=False)
+            return json.dumps(_agent_feed_result(result), ensure_ascii=False)
 
         @tool("get_feed_bot_status")
         async def get_feed_bot_status() -> str:

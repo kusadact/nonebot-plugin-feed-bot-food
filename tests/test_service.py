@@ -95,13 +95,15 @@ async def test_status_contains_today_yesterday_and_total_fields() -> None:
 
 
 @pytest.mark.asyncio
-async def test_feed_result_reports_weight_without_today_gain() -> None:
+async def test_feed_result_reports_today_cumulative_gain_without_today_weight() -> None:
     with TemporaryDirectory() as directory:
         service = service_for(FixedGainGenerator("0.62"), Path(directory) / "state.json")
-        result = await service.feed("bot", "user", "饭", moment(8))
+        await service.feed("bot", "user", "饭", moment(8))
+        result = await service.feed("bot", "user", "面", moment(8))
 
     assert result["current_weight_kg"] == 48.00
     assert result["gain_kg"] == 0.62
+    assert result["today_gain_kg"] == 1.24
     assert "category" not in result
 
 
