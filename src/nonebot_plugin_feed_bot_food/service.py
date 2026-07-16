@@ -144,9 +144,6 @@ class FeedService:
                 "food": food,
                 "gain_kg": _json_number(gain),
                 "today_gain_kg": _json_number(daily.gain),
-                "current_weight_kg": _json_number(
-                    _reported_weight(state.current_weight, daily.gain)
-                ),
                 "reply_required": True,
             }
             return result

@@ -68,10 +68,10 @@ def test_success_feed_reports_random_gain() -> None:
             "status": "success",
             "food": "汉堡",
             "gain_kg": 1.0,
-            "current_weight_kg": 49.0,
+            "today_gain_kg": 1.0,
         }
     )
-    assert reply == "投喂汉堡成功，增加 1.00kg，当前体重 49.00kg。"
+    assert reply == "投喂汉堡成功，今天一共吃了 1.00kg。"
 
 
 @pytest.mark.asyncio

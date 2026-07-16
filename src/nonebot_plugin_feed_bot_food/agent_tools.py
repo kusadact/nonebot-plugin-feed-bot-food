@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 
 from .service import FeedService
 
@@ -14,15 +13,6 @@ FEED_BOT_FOOD_INSTRUCTIONS = (
     "- 用户询问当前体重或投喂统计时调用 get_feed_bot_status。",
     "- 其他工具结果直接根据 message 回复，不要重复调用工具。",
 )
-
-
-def _agent_feed_result(result: dict[str, Any]) -> dict[str, Any]:
-    """Keep the feed tool focused on today's intake instead of unsettled weight."""
-    if result.get("status") != "success":
-        return result
-    result = dict(result)
-    result.pop("current_weight_kg", None)
-    return result
 
 
 def register_agent_tools(service: FeedService) -> bool:
@@ -54,7 +44,7 @@ def register_agent_tools(service: FeedService) -> bool:
                     "message": "投喂暂时失败，请稍后再试。",
                     "reply_required": True,
                 }
-            return json.dumps(_agent_feed_result(result), ensure_ascii=False)
+            return json.dumps(result, ensure_ascii=False)
 
         @tool("get_feed_bot_status")
         async def get_feed_bot_status() -> str:

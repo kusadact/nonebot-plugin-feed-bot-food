@@ -65,10 +65,7 @@ def register_matchers(service: FeedService) -> None:
 def format_feed_result(result: dict[str, Any]) -> str:
     status = result.get("status")
     if status == "success":
-        return (
-            f"投喂{result['food']}成功，增加 {float(result['gain_kg']):.2f}kg，"
-            f"当前体重 {float(result['current_weight_kg']):.2f}kg。"
-        )
+        return f"投喂{result['food']}成功，今天一共吃了 {float(result['today_gain_kg']):.2f}kg。"
     if status == "invalid_food":
         return "请提供要投喂的食物。"
     if status == "total_limited":
