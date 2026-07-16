@@ -38,6 +38,7 @@ def test_status_reply_uses_requested_labels_and_bot_name() -> None:
             "yesterday_gain_kg": 1.25,
             "yesterday_weight_change_kg": 2.50,
             "total_feed_count": 49,
+            "total_gain_kg": 12.34,
         },
         "饭团",
     )
@@ -49,6 +50,7 @@ def test_status_reply_uses_requested_labels_and_bot_name() -> None:
         "昨日体重变化：+5.00斤",
         "昨日累计摄入：2.50斤",
         "历史投喂次数：49",
+        "历史累计摄入：24.68斤",
     ]
 
 

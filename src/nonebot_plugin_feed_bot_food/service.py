@@ -213,6 +213,9 @@ class FeedService:
                 date.fromisoformat(today_key(moment)) - timedelta(days=1)
             ).isoformat()
             yesterday = state.daily.get(yesterday_key, DailyStats())
+            total_gain = quantize_weight(
+                sum((stats.gain for stats in state.daily.values()), Decimal("0.00"))
+            )
             if changed or created:
                 self._sync_state(root, bot_id, state)
                 await self.store.save(root)
@@ -227,6 +230,7 @@ class FeedService:
                 "yesterday_gain_kg": _json_number(yesterday.gain),
                 "yesterday_weight_change_kg": _json_number(yesterday.weight_change),
                 "total_feed_count": state.total_feed_count,
+                "total_gain_kg": _json_number(total_gain),
             }
 
     async def settle(self, bot_id: str, moment: datetime | None = None) -> None:

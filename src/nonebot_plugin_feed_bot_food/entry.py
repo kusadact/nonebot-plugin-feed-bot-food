@@ -93,6 +93,7 @@ def format_status_result(result: dict[str, Any], bot_name: str = "") -> str:
     current_weight = float(result["current_weight_kg"]) * KG_TO_JIN
     today_gain = float(result["today_gain_kg"]) * KG_TO_JIN
     yesterday_gain = float(result["yesterday_gain_kg"]) * KG_TO_JIN
+    total_gain = float(result["total_gain_kg"]) * KG_TO_JIN
     yesterday_change = float(result["yesterday_weight_change_kg"]) * KG_TO_JIN
     formatted_yesterday_change = (
         f"{yesterday_change:.2f}" if yesterday_change == 0 else f"{yesterday_change:+.2f}"
@@ -106,5 +107,6 @@ def format_status_result(result: dict[str, Any], bot_name: str = "") -> str:
             f"昨日体重变化：{formatted_yesterday_change}斤",
             f"昨日累计摄入：{yesterday_gain:.2f}斤",
             f"历史投喂次数：{int(result['total_feed_count'])}",
+            f"历史累计摄入：{total_gain:.2f}斤",
         ]
     )
