@@ -88,7 +88,7 @@ d = 昨日实际摄入 - a
 
 插件通过 groupmate-agent 的注册接口提供两个 Tool：
 
-- `feed_bot_food(food)`：执行投喂并返回今天累计吃了多少；当前体重通过次日结算更新。
+- `feed_bot_food(food)`：执行投喂并返回本次增加的体重和今天累计吃了多少；当前体重通过次日结算更新。
 - `get_feed_bot_status()`：返回当前体重、今日和昨日投喂统计及历史总次数。
 
 Tool 只返回结构化 JSON，不直接发送 OneBot 消息；只有用户明确想让 Bot 吃东西，且输入看起来是可以吃的食物或可以喝的饮料时，Agent 才应调用 `feed_bot_food`。明显不能吃或不能喝的内容应直接拒绝，不调用工具。只要 `feed_bot_food` 已被调用，Agent 必须依据结果调用 `reply_user` 回复，不能调用 `finish` 后静默。Agent Tool 只在群聊上下文提供，groupmate-agent 未安装、未加载或集成关闭时，直接群聊命令仍可用。
