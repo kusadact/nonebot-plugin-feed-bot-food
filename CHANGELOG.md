@@ -2,6 +2,12 @@
 
 本文件只记录插件本身的功能更新与 bugfix。
 
+## [0.1.13] - 2026-08-11
+
+### Changed
+
+- 将 Agent 集成从 `nonebot-plugin-groupmate-agent` 切换到 `nonebot-plugin-ai-groupmate`；配置项名称不变。
+
 ## [0.1.10] - 2026-07-16
 
 ### Changed
@@ -20,7 +26,6 @@
 
 ### Changed
 
-- 将 Agent 集成从 `nonebot-plugin-groupmate-agent` 切换到 `nonebot-plugin-ai-groupmate`；配置项名称不变。
 - 修正当前体重显示，避免将今日累计摄入重复计入当前体重。
 - 调整 `/查看体重` 输出文案，增加 Bot 名称和昨日累计摄入，并统一投喂统计字段名称。
 - 新增 `FEED_BOT_FOOD__METABOLIC_POWER` 配置，默认指数调整为 `2.00`；状态查询中的重量单位改为斤。
