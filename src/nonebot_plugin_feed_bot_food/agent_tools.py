@@ -17,14 +17,17 @@ FEED_BOT_FOOD_INSTRUCTIONS = (
 
 
 def register_agent_tools(service: FeedService) -> bool:
-    """Register optional groupmate-agent tools without making it a hard dependency."""
+    """Register optional ai-groupmate tools without making it a hard dependency."""
     try:
         from nonebot import require
 
-        require("nonebot_plugin_groupmate_agent")
+        require("nonebot_plugin_ai_groupmate")
         from langchain.tools import tool
-        from nonebot_plugin_groupmate_agent.agent import AgentToolBundle, AgentToolContext, register_agent_tool
-        from nonebot_plugin_groupmate_agent.agent.optional_tools import ToolLimitSpec
+        from nonebot_plugin_ai_groupmate.agent import (
+            AgentToolBundle,
+            AgentToolContext,
+            register_agent_tool,
+        )
     except (ImportError, RuntimeError):
         return False
 
@@ -54,13 +57,8 @@ def register_agent_tools(service: FeedService) -> bool:
             return json.dumps(result, ensure_ascii=False)
 
         return AgentToolBundle(
-            name="feed_bot_food",
             tools=[feed_bot_food, get_feed_bot_status],
             instructions=FEED_BOT_FOOD_INSTRUCTIONS,
-            tool_limits=[
-                ToolLimitSpec(tool_name="feed_bot_food", run_limit=1),
-                ToolLimitSpec(tool_name="get_feed_bot_status", run_limit=1),
-            ],
         )
 
     return True

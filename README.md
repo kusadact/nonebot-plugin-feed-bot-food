@@ -32,7 +32,7 @@ FEED_BOT_FOOD__ENABLE_GROUPMATE_AGENT=true
 - `WINDOW_HOURS`：固定投喂窗口长度，默认 6 小时。
 - `CATEGORY_LIMITS`：每名用户每个窗口所有类别合计的成功投喂次数，默认 3 次。虽然配置名沿用旧名称，但值现在是单个整数。
 - `RANDOM_GAIN_RANGE`：每次成功投喂随机增加的体重范围，默认 `0.05～1.00kg`。
-- `ENABLE_GROUPMATE_AGENT`：是否注册 Agent Tool，默认开启；groupmate-agent 不可用时自动跳过。
+- `ENABLE_GROUPMATE_AGENT`：是否注册 Agent Tool，默认开启；ai-groupmate 不可用时自动跳过。
 
 最低体重固定为 `0.00kg`，每天 Asia/Shanghai 时间 `06:00` 结算昨日体重，不作为配置项。
 
@@ -84,14 +84,14 @@ d = 昨日实际摄入 - a
 
 结算后体重不会低于 `0.00kg`。Bot 离线时，重新连接后会补做尚未结算的日期，且同一天只结算一次。
 
-## groupmate-agent 集成
+## ai-groupmate 集成
 
-插件通过 groupmate-agent 的注册接口提供两个 Tool：
+插件通过 ai-groupmate 的注册接口提供两个 Tool：
 
 - `feed_bot_food(food)`：执行投喂并返回本次增加的体重和今天累计吃了多少；当前体重通过次日结算更新。
 - `get_feed_bot_status()`：返回当前体重、今日和昨日投喂统计及历史总次数。
 
-Tool 只返回结构化 JSON，不直接发送 OneBot 消息；只有用户明确想让 Bot 吃东西，且输入看起来是可以吃的食物或可以喝的饮料时，Agent 才应调用 `feed_bot_food`。明显不能吃或不能喝的内容应直接拒绝，不调用工具。只要 `feed_bot_food` 已被调用，Agent 必须依据结果调用 `reply_user` 回复，不能调用 `finish` 后静默。Agent Tool 只在群聊上下文提供，groupmate-agent 未安装、未加载或集成关闭时，直接群聊命令仍可用。
+Tool 只返回结构化 JSON，不直接发送 OneBot 消息；只有用户明确想让 Bot 吃东西，且输入看起来是可以吃的食物或可以喝的饮料时，Agent 才应调用 `feed_bot_food`。明显不能吃或不能喝的内容应直接拒绝，不调用工具。只要 `feed_bot_food` 已被调用，Agent 必须依据结果调用 `reply_user` 回复，不能调用 `finish` 后静默。Agent Tool 只在群聊上下文提供，ai-groupmate 未安装、未加载或集成关闭时，直接群聊命令仍可用。
 
 ## 数据文件
 

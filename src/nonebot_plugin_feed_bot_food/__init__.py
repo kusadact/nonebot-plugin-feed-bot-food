@@ -37,9 +37,9 @@ register_scheduler(feed_service)
 
 if plugin_config.enable_groupmate_agent:
     try:
-        if importlib.util.find_spec("nonebot_plugin_groupmate_agent") is not None:
-            require("nonebot_plugin_groupmate_agent")
+        if importlib.util.find_spec("nonebot_plugin_ai_groupmate") is not None:
+            require("nonebot_plugin_ai_groupmate")
             if register_agent_tools(feed_service):
-                logger.info("已注册 groupmate-agent 投喂工具")
+                logger.info("已注册 ai-groupmate 投喂工具")
     except Exception:
-        logger.warning("groupmate-agent 不可用，跳过投喂工具注册")
+        logger.warning("ai-groupmate 不可用，跳过投喂工具注册")
