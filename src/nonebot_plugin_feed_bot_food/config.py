@@ -20,6 +20,7 @@ class FeedBotFoodConfig(BaseModel):
     category_limits: int = 3
     random_gain_range: tuple[Decimal, Decimal] = DEFAULT_RANDOM_GAIN_RANGE
     enable_groupmate_agent: bool = True
+    shared_state: bool = False
 
     @field_validator("initial_weight")
     @classmethod

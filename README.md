@@ -24,6 +24,7 @@ FEED_BOT_FOOD__WINDOW_HOURS=6
 FEED_BOT_FOOD__CATEGORY_LIMITS=3
 FEED_BOT_FOOD__RANDOM_GAIN_RANGE=[0.05, 1.00]
 FEED_BOT_FOOD__ENABLE_GROUPMATE_AGENT=true
+FEED_BOT_FOOD__SHARED_STATE=false
 ```
 
 - `INITIAL_WEIGHT`：首次创建某个 Bot 状态时的初始体重，默认 `48.00kg`。
@@ -33,6 +34,7 @@ FEED_BOT_FOOD__ENABLE_GROUPMATE_AGENT=true
 - `CATEGORY_LIMITS`：每名用户每个窗口所有类别合计的成功投喂次数，默认 3 次。虽然配置名沿用旧名称，但值现在是单个整数。
 - `RANDOM_GAIN_RANGE`：每次成功投喂随机增加的体重范围，默认 `0.05～1.00kg`。
 - `ENABLE_GROUPMATE_AGENT`：是否注册 Agent Tool，默认开启；ai-groupmate 不可用时自动跳过。
+- `SHARED_STATE`：是否让所有 Bot QQ 号共用同一份状态数据，默认关闭。开启后使用固定的共享状态；已有按 QQ 号保存的数据不会自动合并。
 
 最低体重固定为 `0.00kg`，每天 Asia/Shanghai 时间 `06:00` 结算昨日体重，不作为配置项。
 
@@ -95,7 +97,7 @@ Tool 只返回结构化 JSON，不直接发送 OneBot 消息；只有用户明�
 
 ## 数据文件
 
-状态保存在 NoneBot 插件标准数据目录的 `state.json` 中。数据按 Bot ID 分区，使用原子写入和进程内锁保护并发更新。
+状态保存在 NoneBot 插件标准数据目录的 `state.json` 中。默认按 Bot ID 分区；开启 `SHARED_STATE` 后所有 Bot 共用固定的共享分区。使用原子写入和进程内锁保护并发更新。
 
 当前状态文件格式为 schema v3。首次读取 schema v1 或 v2 文件时，插件会自动补齐每日体重变化字段，并移除旧 LLM 投喂事件中的 `category` 和 `user_attempts` 字段，然后原子写回 v3。
 

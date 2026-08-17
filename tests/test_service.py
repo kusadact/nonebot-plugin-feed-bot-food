@@ -45,6 +45,24 @@ def service_for(gain_generator: object, path: Path, **kwargs: object) -> FeedSer
 
 def test_metabolic_power_defaults_to_two() -> None:
     assert FeedBotFoodConfig().metabolic_power == Decimal("2.00")
+    assert FeedBotFoodConfig().shared_state is False
+
+
+@pytest.mark.asyncio
+async def test_shared_state_is_used_by_all_bot_ids() -> None:
+    with TemporaryDirectory() as directory:
+        service = service_for(
+            FixedGainGenerator("0.62"),
+            Path(directory) / "state.json",
+            shared_state=True,
+        )
+        await service.feed("old-bot", "user", "饭", moment(8))
+        result = await service.get_status("new-bot", moment(8))
+        data = await JsonStateStore(Path(directory) / "state.json").load()
+
+    assert result["today_feed_count"] == 1
+    assert result["total_feed_count"] == 1
+    assert set(data["bots"]) == {"__shared__"}
 
 
 @pytest.mark.asyncio

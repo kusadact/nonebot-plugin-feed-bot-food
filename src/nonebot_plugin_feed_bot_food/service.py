@@ -23,6 +23,7 @@ INTERNAL_ERROR_MESSAGE = "投喂暂时失败，请稍后再试。"
 SATURATION_LIMIT = Decimal("7.8541")
 SATURATION_SCALE = Decimal("20.7809")
 MIN_WEIGHT = Decimal("0.00")
+SHARED_STATE_KEY = "__shared__"
 
 
 def _json_number(value: Decimal) -> float:
@@ -191,18 +192,21 @@ class FeedService:
 
     def _get_state(self, root: dict[str, Any], bot_id: str, moment: datetime) -> tuple[BotState, bool]:
         bots = root.setdefault("bots", {})
-        raw_state = bots.get(str(bot_id))
+        state_key = self._state_key(bot_id)
+        raw_state = bots.get(state_key)
         if raw_state is None:
             current_day = date.fromisoformat(today_key(moment))
             state = empty_state(self.config.initial_weight, (current_day - timedelta(days=1)).isoformat())
-            bots[str(bot_id)] = state.to_dict()
+            bots[state_key] = state.to_dict()
             return state, True
         state = BotState.from_dict(raw_state)
         return state, False
 
-    @staticmethod
-    def _sync_state(root: dict[str, Any], bot_id: str, state: BotState) -> None:
-        root.setdefault("bots", {})[str(bot_id)] = state.to_dict()
+    def _sync_state(self, root: dict[str, Any], bot_id: str, state: BotState) -> None:
+        root.setdefault("bots", {})[self._state_key(bot_id)] = state.to_dict()
+
+    def _state_key(self, bot_id: str) -> str:
+        return SHARED_STATE_KEY if self.config.shared_state else str(bot_id)
 
     def _settle_state(self, state: BotState, moment: datetime) -> bool:
         current_day = date.fromisoformat(today_key(moment))
